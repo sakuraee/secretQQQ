@@ -1,10 +1,20 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import KLineChart from './components/KLineChart'
 import './App.css'
 
 function App() {
   const [product, setProduct] = useState('BTC/USDT')
   const [isReal, setIsReal] = useState(true)
+  const [trades, setTrades] = useState('')
+  const [initialAmount, setInitialAmount] = useState(10000)
+
+  const parsedTrades = useMemo(() => {
+    try {
+      return JSON.parse(trades)
+    } catch {
+      return []
+    }
+  }, [trades])
 
   return (
     <div className="app">
@@ -27,9 +37,34 @@ function App() {
           />
           实盘数据
         </label>
+
+        <div>
+          <label>初始金额: 
+            <input
+              type="number"
+              value={initialAmount}
+              onChange={(e) => setInitialAmount(Number(e.target.value))}
+            />
+          </label>
+        </div>
+
+        <div>
+          <label>交易数据(JSON格式): 
+            <textarea
+              value={trades}
+              onChange={(e) => setTrades(e.target.value)}
+              placeholder='例如: [["2025-05-15T10:00:00", "buy"], ["2025-05-15T12:00:00", "sell"]]'
+            />
+          </label>
+        </div>
       </div>
       
-      <KLineChart product={product} isReal={isReal} />
+      <KLineChart 
+        product={product} 
+        isReal={isReal}
+        trades={parsedTrades}
+        initialAmount={initialAmount}
+      />
     </div>
   )
 }
