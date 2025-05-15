@@ -1,0 +1,67 @@
+# 全局通用忽略
+.DS_Store
+*.tmp
+*.sw?
+Thumbs.db
+
+# 全局日志文件
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# 全局环境变量
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 全局IDE配置
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# 后端特定忽略
+backend/node_modules/
+backend/dist/
+backend/build/
+backend/out/
+backend/coverage/
+backend/.nyc_output
+backend/generated/
+backend/.temp
+backend/.tmp
+backend/pids
+backend/*.pid
+backend/*.seed
+backend/*.pid.lock
+backend/report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+backend/pnpm-lock.yaml
+
+# 前端特定忽略
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+frontend/package-lock.json
+
+# 保留子目录原有的.gitignore文件
+backend/.gitignore
+frontend/.gitignore
