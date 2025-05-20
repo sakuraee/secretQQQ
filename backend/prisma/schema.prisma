@@ -7,12 +7,13 @@ output = "../node_modules/.prisma/client"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("POSTGRES_DATABASE_CONNECT_STRING")
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
+
 model KLineData {
-  id        Int      @id @default(autoincrement())
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
   timestamp DateTime @unique
   open      Float
   high      Float

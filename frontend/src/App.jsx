@@ -1,12 +1,32 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import KLineChart from './components/KLineChart'
 import './App.css'
 
 function App() {
-  const [product, setProduct] = useState('BTC/USDT')
+  const [products, setProducts] = useState([])
+  const [product, setProduct] = useState('')
   const [isReal, setIsReal] = useState(true)
   const [trades, setTrades] = useState('')
   const [initialAmount, setInitialAmount] = useState(10000)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/kline/products')
+        const data = await response.json()
+        setProducts(data)
+        if (data.length > 0) {
+          setProduct(data[0])
+        }
+      } catch (error) {
+        console.error('Failed to fetch products:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProducts()
+  }, [])
 
   const parsedTrades = useMemo(() => {
     try {
@@ -16,6 +36,10 @@ function App() {
     }
   }, [trades])
 
+  if (loading) {
+    return <div className="app">Loading...</div>
+  }
+
   return (
     <div className="app">
       <h1>K线图表</h1>
@@ -24,9 +48,9 @@ function App() {
           value={product} 
           onChange={(e) => setProduct(e.target.value)}
         >
-          <option value="BTC/USDT">BTC/USDT</option>
-          <option value="ETH/USDT">ETH/USDT</option>
-          <option value="BNB/USDT">BNB/USDT</option>
+          {products.map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
         </select>
         
         <label>
