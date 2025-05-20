@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Query, UploadedFile, UseInterceptors, Body, Param } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { KlineService } from './kline.service';
 
@@ -75,5 +75,20 @@ export class KlineController {
   @Get('bars')
   async getAllBars(): Promise<string[]> {
     return this.klineService.getAllBars();
+  }
+
+  @Post('save-code')
+  async saveCode(@Body() body: { code: string }) {
+    return this.klineService.saveCode(body.code);
+  }
+
+  @Get('saved-codes')
+  async getSavedCodes() {
+    return this.klineService.getSavedCodes();
+  }
+
+  @Get('code/:id')
+  async getCode(@Param('id') id: string) {
+    return this.klineService.getCode(id);
   }
 }
