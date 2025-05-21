@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Query, UploadedFile, UseInterceptors, Body, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+  Body,
+  Param,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { KlineService } from './kline.service';
 
@@ -22,24 +31,29 @@ export class KlineController {
   constructor(private readonly klineService: KlineService) {}
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file', {
-    limits: {
-      fileSize: 200 * 1024 * 1024 // 50MB
-    }
-  }))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 200 * 1024 * 1024, // 50MB
+      },
+    }),
+  )
   async uploadKlineFile(
     @UploadedFile() file: Express.Multer.File,
-    @Query('isReal') isReal: string
+    @Query('isReal') isReal: string,
   ): Promise<{
     success: boolean;
     message: string;
     data: {
       product: string;
-      stats: {total: number, inserted: number, duplicates: number};
-      timeRange: {start: string, end: string};
-    }
+      stats: { total: number; inserted: number; duplicates: number };
+      timeRange: { start: string; end: string };
+    };
   }> {
-    const result = await this.klineService.processKlineFile(file, isReal === 'true');
+    const result = await this.klineService.processKlineFile(
+      file,
+      isReal === 'true',
+    );
     console.log(result);
     return {
       success: true,
@@ -47,8 +61,8 @@ export class KlineController {
       data: {
         product: result.product,
         stats: result.stats,
-        timeRange: result.timeRange
-      }
+        timeRange: result.timeRange,
+      },
     };
   }
 
@@ -78,8 +92,13 @@ export class KlineController {
   }
 
   @Post('save-code')
-  async saveCode(@Body() body: { code: string }) {
-    return this.klineService.saveCode(body.code);
+  async saveCode(@Body() body: { code: string; name?: string }) {
+    return this.klineService.saveCode(body.code, body.name);
+  }
+
+  @Post('rename-code')
+  async renameCode(@Body() body: { id: string; newName: string }) {
+    return this.klineService.renameCode(body.id, body.newName);
   }
 
   @Get('saved-codes')

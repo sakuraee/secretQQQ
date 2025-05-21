@@ -3,6 +3,7 @@ import { MongoClient, ObjectId } from 'mongodb';
 
 interface SavedCode {
   _id: ObjectId;
+  name: string;
   code: string;
   createdAt: Date;
   updatedAt: Date;
@@ -10,8 +11,10 @@ interface SavedCode {
 
 interface CodeResult {
   id: string;
+  name: string;
   code: string;
   createdAt: Date;
+  updatedAt: Date;
 }
 import * as fs from 'fs';
 import { promisify } from 'util';
@@ -197,25 +200,42 @@ export class KlineService {
     return bars;
   }
 
-  async saveCode(code: string) {
+  async saveCode(code: string, name?: string) {
     const db = this.client.db(DB_NAME);
     const collection = db.collection('SavedCodes');
-    const result = await collection.insertOne({
+    
+    const doc = {
+      name: name || `Untitled-${Date.now()}`,
       code,
       createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+      updatedAt: new Date()
+    };
+    
+    const result = await collection.insertOne(doc);
     return result.insertedId.toString();
   }
+
+  async renameCode(id: string, newName: string) {
+    const db = this.client.db(DB_NAME);
+    const collection = db.collection('SavedCodes');
+    const result = await collection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { name: newName, updatedAt: new Date() } }
+    );
+    return result.modifiedCount > 0;
+  }
+
 
   async getSavedCodes() {
     const db = this.client.db(DB_NAME);
     const collection = db.collection('SavedCodes');
-    const codes = await collection.find().sort({ createdAt: -1 }).toArray();
+    const codes = await collection.find().sort({ updatedAt: -1 }).toArray();
     return codes.map((doc) => ({
       id: doc._id.toString(),
+      name: doc.name,
       code: doc.code,
       createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt
     }));
   }
 
@@ -228,8 +248,10 @@ export class KlineService {
     }
     return {
       id: doc._id.toString(),
+      name: doc.name,
       code: doc.code,
       createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt
     };
   }
 }

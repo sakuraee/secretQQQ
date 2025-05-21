@@ -408,63 +408,7 @@ export default function KLineChart({ product, trades: propTrades = [], initialAm
           </Table>
         </TableContainer>
       </div>
-
-      </div>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <select 
-            onChange={(e) => handleLoadCode(e.target.value)}
-            style={{ padding: '8px', borderRadius: '4px' }}
-          >
-            <option value="">加载历史代码</option>
-            {savedCodes.map((item) => (
-              <option key={item.id} value={item.id}>
-                {new Date(item.createdAt).toLocaleString()}
-              </option>
-            ))}
-          </select>
-          <button 
-            onClick={handleSaveCode}
-            style={{ 
-              padding: '8px 16px',
-              backgroundColor: '#1890ff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            保存代码
-          </button>
-          <button 
-            onClick={handleRunCode}
-            style={{ 
-              padding: '8px 16px',
-              backgroundColor: '#14b143',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            运行代码
-          </button>
-        </div>
-        <textarea
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          style={{
-            flex: 1,
-            padding: '10px',
-            fontFamily: 'monospace',
-            fontSize: '14px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            minHeight: '500px'
-          }}
-        />
-      </div>
-      <div style={{ position: 'relative' }}>
+      <div >
         {isLoading && (
           <div style={{
             position: 'absolute',
@@ -482,7 +426,8 @@ export default function KLineChart({ product, trades: propTrades = [], initialAm
         )}
         <div ref={chartRef} style={{ width: '100%', height: '500px' }} />
       </div>
-
+      </div>
+      
       <Dialog open={openDialog} onClose={handleCloseDialog}>
         <DialogTitle>上传结果</DialogTitle>
         <DialogContent>
