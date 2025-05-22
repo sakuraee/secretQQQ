@@ -65,3 +65,5 @@ frontend/package-lock.json
 # 保留子目录原有的.gitignore文件
 backend/.gitignore
 frontend/.gitignore
+
+node_modules/

@@ -21,7 +21,15 @@ import {
   Button
 } from '@mui/material';
 
-export default function KLineChart({ product, trades: propTrades = [], initialAmount = 10000 }) {
+export default function KLineChart({ 
+  product, 
+  timeScale,
+  startTime,
+  endTime,
+  trades: propTrades = [], 
+  initialAmount = 10000, 
+  onKlineDataLoaded 
+}) {
   const [trades, setTrades] = useState(propTrades);
   const [summary, setSummary] = useState({
     totalTrades: 0,
@@ -78,58 +86,20 @@ export default function KLineChart({ product, trades: propTrades = [], initialAm
   const [klineData, setKlineData] = useState([]);
 
   useEffect(() => {
-    if (propTrades && propTrades.length > 0 && klineData.length > 0) {
-      let position = null;
-      const processedTrades = [];
-      let totalProfit = 0;
-      let winCount = 0;
-      let maxProfit = 0;
-      let maxLoss = 0;
-      let currentBalance = initialAmount;
+    if (propTrades && propTrades.length > 0) {
+      // 只统计已平仓的交易
+      const closedTrades = propTrades.filter(trade => trade.sellTime && trade.sellPrice);
+      
+      const totalProfit = closedTrades.reduce((sum, trade) => sum + (trade.profit || 0), 0);
+      const winCount = closedTrades.filter(trade => trade.profit > 0).length;
+      const maxProfit = Math.max(...closedTrades.map(trade => trade.profit || 0), 0);
+      const maxLoss = Math.min(...closedTrades.map(trade => trade.profit || 0), 0);
 
-      for (const trade of propTrades) {
-        const [time, action] = trade;
-        const tradeTime = new Date(time);
-        
-        // 在K线数据中查找最接近的时间点
-        const findKline = (time) => {
-          return klineData.reduce((prev, curr) => {
-            const prevDiff = Math.abs(new Date(prev.timestamp) - time);
-            const currDiff = Math.abs(new Date(curr.timestamp) - time);
-            return currDiff < prevDiff ? curr : prev;
-          });
-        };
-
-        const kline = findKline(tradeTime);
-        
-        if (action === 'buy' && !position) {
-          position = {
-            buyTime: kline.timestamp,
-            buyPrice: kline.open, // 买入使用开盘价
-            sellTime: null,
-            sellPrice: null,
-            profit: null
-          };
-        } else if (action === 'sell' && position) {
-          position.sellTime = kline.timestamp;
-          position.sellPrice = kline.close; // 卖出使用收盘价
-          position.profit = ((position.sellPrice - position.buyPrice) / position.buyPrice) * 100;
-          totalProfit += position.profit;
-          
-          if (position.profit > 0) winCount++;
-          if (position.profit > maxProfit) maxProfit = position.profit;
-          if (position.profit < maxLoss) maxLoss = position.profit;
-          
-          processedTrades.push(position);
-          position = null;
-        }
-      }
-
-      setTrades(processedTrades);
+      setTrades(propTrades);
       setSummary({
-        totalTrades: processedTrades.length,
+        totalTrades: closedTrades.length,
         totalProfit,
-        winRate: processedTrades.length > 0 ? (winCount / processedTrades.length * 100) : 0,
+        winRate: closedTrades.length > 0 ? (winCount / closedTrades.length * 100) : 0,
         maxProfit,
         maxLoss
       });
@@ -141,12 +111,21 @@ export default function KLineChart({ product, trades: propTrades = [], initialAm
     
     const fetchData = async () => {
       try {
+        const params = {
+          product,
+          isReal
+        };
+        if (timeScale) params.bar = timeScale;
+        if (startTime) params.startTime = new Date(startTime).toISOString();
+        if (endTime) params.endTime = new Date(endTime).toISOString();
+        
         const response = await axios.get('http://localhost:3000/kline', {
-          params: { product, isReal }
+          params
         });
         
         const klineData = response.data;
         setKlineData(klineData); // 保存K线数据用于交易处理
+        onKlineDataLoaded?.(klineData); // 通知父组件数据已加载
         const dates = klineData.map(item => new Date(item.timestamp));
         
         if (dates.length > 0) {
@@ -162,7 +141,7 @@ export default function KLineChart({ product, trades: propTrades = [], initialAm
 
         const option = {
           title: {
-            text: `${product} K线图 (${isReal ? '实盘' : '模拟'})`,
+            text: `${product} ${timeScale || ''} K线图 (${isReal ? '实盘' : '模拟'})`,
             subtext: `数据时间范围: ${timeRange}`,
             left: 'center'
           },
@@ -259,37 +238,6 @@ export default function KLineChart({ product, trades: propTrades = [], initialAm
     
     return () => chart.dispose();
   }, [product, isReal, timeRange]);
-
-  const [code, setCode] = useState('');
-  const [savedCodes, setSavedCodes] = useState([]);
-
-  const handleSaveCode = async () => {
-    try {
-      await axios.post('http://localhost:3000/kline/save-code', { code });
-      const response = await axios.get('http://localhost:3000/kline/saved-codes');
-      setSavedCodes(response.data);
-    } catch (error) {
-      console.error('Error saving code:', error);
-    }
-  };
-
-  const handleLoadCode = async (id) => {
-    try {
-      const response = await axios.get(`http://localhost:3000/kline/code/${id}`);
-      setCode(response.data.code);
-    } catch (error) {
-      console.error('Error loading code:', error);
-    }
-  };
-
-  const handleRunCode = () => {
-    try {
-      // 这里可以添加代码执行逻辑
-      console.log('Running code:', code);
-    } catch (error) {
-      console.error('Error running code:', error);
-    }
-  };
 
   return (
     <div style={{ width: '100%', display: 'flex', gap: '20px' }}>
@@ -393,17 +341,22 @@ export default function KLineChart({ product, trades: propTrades = [], initialAm
               </TableRow>
             </TableHead>
             <TableBody>
-              {trades.map((trade, index) => (
-                <TableRow key={index}>
-                  <TableCell>{new Date(trade.buyTime).toLocaleString()}</TableCell>
-                  <TableCell>{trade.buyPrice.toFixed(4)}</TableCell>
-                  <TableCell>{new Date(trade.sellTime).toLocaleString()}</TableCell>
-                  <TableCell>{trade.sellPrice.toFixed(4)}</TableCell>
-                  <TableCell style={{ color: trade.profit >= 0 ? 'green' : 'red' }}>
-                    {trade.profit.toFixed(2)}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {trades.map((trade, index) => {
+                const isClosed = trade.sellTime && trade.sellPrice;
+                return (
+                  <TableRow key={index}>
+                    <TableCell>{new Date(trade.buyTime).toLocaleString()}</TableCell>
+                    <TableCell>{trade.buyPrice?.toFixed(4) || '-'}</TableCell>
+                    <TableCell>{trade.sellTime ? new Date(trade.sellTime).toLocaleString() : '未平仓'}</TableCell>
+                    <TableCell>{trade.sellPrice?.toFixed(4) || '-'}</TableCell>
+                    <TableCell style={{ 
+                      color: isClosed ? (trade.profit >= 0 ? 'green' : 'red') : 'inherit'
+                    }}>
+                      {isClosed ? trade.profit?.toFixed(2) : '-'}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -450,3 +403,7 @@ export default function KLineChart({ product, trades: propTrades = [], initialAm
     </div>
   );
 }
+
+// TODO : 整体的数据计算有误，并且应该支持输入手续费率
+// 整个的交易数据应该支持CURD
+// 可以尝试一下弄些策略测试了

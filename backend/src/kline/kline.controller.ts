@@ -70,6 +70,7 @@ export class KlineController {
   async getKlines(
     @Query('product') product?: string,
     @Query('isReal') isReal?: string,
+    @Query('bar') bar?: string,
     @Query('startTime') startTime?: string,
     @Query('endTime') endTime?: string,
   ): Promise<KLineData[]> {
@@ -78,6 +79,7 @@ export class KlineController {
       isReal ? isReal === 'true' : undefined,
       startTime ? new Date(startTime) : undefined,
       endTime ? new Date(endTime) : undefined,
+      bar
     );
   }
 
@@ -92,8 +94,18 @@ export class KlineController {
   }
 
   @Post('save-code')
-  async saveCode(@Body() body: { code: string; name?: string }) {
-    return this.klineService.saveCode(body.code, body.name);
+  async saveCode(@Body() body: { code: string; name?: string; id?: string }) {
+    if (body.id) {
+      // 更新现有代码
+      const updated = await this.klineService.renameCode(body.id, body.name || '');
+      if (!updated) {
+        throw new Error('更新失败');
+      }
+      return this.klineService.saveCode(body.code, body.name);
+    } else {
+      // 创建新代码
+      return this.klineService.saveCode(body.code, body.name);
+    }
   }
 
   @Post('rename-code')

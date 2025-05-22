@@ -152,6 +152,7 @@ export class KlineService {
     isReal?: boolean,
     startTime?: Date,
     endTime?: Date,
+    bar? :string 
   ) {
     const db = this.client.db(DB_NAME);
     const collection = db.collection('KLineData');
@@ -159,6 +160,7 @@ export class KlineService {
     const query: any = {};
     if (product) query.product = product;
     if (isReal !== undefined) query.isReal = isReal;
+    if (bar !== undefined) query.bar = bar;
     if (startTime || endTime) {
       query.timestamp = {};
       if (startTime) query.timestamp.$gte = startTime;
@@ -201,18 +203,34 @@ export class KlineService {
   }
 
   async saveCode(code: string, name?: string) {
+    if (!name) {
+      name = `Untitled-${Date.now()}`;
+    }
+
     const db = this.client.db(DB_NAME);
     const collection = db.collection('SavedCodes');
     
-    const doc = {
-      name: name || `Untitled-${Date.now()}`,
-      code,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+    // 检查同名文档是否存在
+    const existingDoc = await collection.findOne({ name });
     
-    const result = await collection.insertOne(doc);
-    return result.insertedId.toString();
+    if (existingDoc) {
+      // 更新现有文档
+      const result = await collection.updateOne(
+        { _id: existingDoc._id },
+        { $set: { code, updatedAt: new Date() } }
+      );
+      return existingDoc._id.toString();
+    } else {
+      // 创建新文档
+      const doc = {
+        name,
+        code,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      const result = await collection.insertOne(doc);
+      return result.insertedId.toString();
+    }
   }
 
   async renameCode(id: string, newName: string) {
