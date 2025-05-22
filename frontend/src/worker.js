@@ -2,12 +2,12 @@ self.onmessage = function(e) {
   const { code, klineData, initialAmount } = e.data
   const trades = []
   let currentPosition = null
-  const executeUserCode = new Function('index', 'klineData',  code)
+  const executeUserCode = new Function('index', 'klineData', 'currentHold',  code)
   
   klineData.forEach((point, index) => {
     try {
-      const result = executeUserCode(index, klineData)
-      
+      const result = executeUserCode(index, klineData , currentPosition !== null)
+
       if (result && result.action === 'buy' && !currentPosition) {
         // 开仓
         currentPosition = {
@@ -34,7 +34,7 @@ self.onmessage = function(e) {
     } catch (err) {
       console.error(`执行用户代码出错(时间点: ${point.timestamp}):`, err)
     }
-    
+
     // 每处理100个数据点发送一次进度
     if (index % 100 === 0) {
       self.postMessage({

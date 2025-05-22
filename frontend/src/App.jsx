@@ -1,7 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import axios from 'axios'
 import KLineChart from './components/KLineChart'
+import Editor from 'react-simple-code-editor'
+import { highlight, languages } from 'prismjs'
+import 'prismjs/components/prism-javascript'
+import 'prismjs/themes/prism.css'
 import './App.css'
+import { Snackbar, Alert } from '@mui/material'
 
 function App() {
   const [products, setProducts] = useState([])
@@ -18,10 +23,27 @@ function App() {
   const [savedCodes, setSavedCodes] = useState([])
   const [executionProgress, setExecutionProgress] = useState(0)
   const [isExecuting, setIsExecuting] = useState(false)
-  const [code, setCode] = useState('')
+  const [code, setCode] = useState('// @index 当前的索引 @klineData 总的k线数据')
   const [selectedCodeId, setSelectedCodeId] = useState(null)
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  })
   const splitContainerRef = useRef(null)
   const leftPanelRef = useRef(null)
+
+  const showMessage = (message, severity = 'success') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    })
+  }
+
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({...prev, open: false}))
+  }
 
   const saveCode = async (code, name) => {
     try {
@@ -29,33 +51,64 @@ function App() {
       const existingCode = savedCodes.find(c => c.name === name)
       
       if (existingCode) {
-        const shouldUpdate = window.confirm(`文档"${name}"已存在，是否更新？`)
-        if (!shouldUpdate) return
-        
-        // 更新现有文档
+        // 直接更新现有文档
         await axios.post('http://localhost:3000/kline/save-code', { 
           code, 
           name,
           id: existingCode.id // 传递ID表示更新
         })
+        showMessage('文档已自动更新保存')
       } else {
         // 创建新文档
         await axios.post('http://localhost:3000/kline/save-code', { code, name })
+        showMessage('文档已保存')
       }
       
       // 刷新列表
       const response = await axios.get('http://localhost:3000/kline/saved-codes')
       setSavedCodes(response.data)
-      alert(existingCode ? '文档已更新' : '文档已保存')
     } catch (error) {
       if (error.response?.data?.message?.includes('already exists')) {
-        alert('错误：同名文档已存在')
+        showMessage('错误：同名文档已存在', 'error')
       } else {
         console.error('Error saving code:', error)
-        alert('保存失败: ' + error.message)
+        showMessage('保存失败: ' + error.message, 'error')
       }
     }
   }
+
+  // 定时保存
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (code && selectedCodeId) {
+        const selectedCode = savedCodes.find(c => c.id === selectedCodeId)
+        if (selectedCode) {
+          saveCode(code, selectedCode.name)
+        }
+      }
+    }, 10000) // 每5分钟保存一次
+
+    return () => clearInterval(interval)
+  }, [code, selectedCodeId, savedCodes])
+
+  // 页面关闭前保存
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (code && selectedCodeId) {
+        e.preventDefault()
+        e.returnValue = ''
+        const selectedCode = savedCodes.find(c => c.id === selectedCodeId)
+        if (selectedCode) {
+          saveCode(code, selectedCode.name)
+        }
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [code, selectedCodeId, savedCodes])
 
   const renameCode = async (id, newName) => {
     try {
@@ -68,6 +121,11 @@ function App() {
   }
 
   const loadCode = async (id) => {
+    if (!id) {
+      setCode('')
+      setSelectedCodeId(null)
+      return
+    }
     try {
       const response = await axios.get(`http://localhost:3000/kline/code/${id}`)
       setCode(response.data.code)
@@ -292,6 +350,13 @@ function App() {
               ))}
             </select>
             <button onClick={() => {
+              if (selectedCodeId) {
+                const selectedCode = savedCodes.find(c => c.id === selectedCodeId)
+                if (selectedCode) {
+                  saveCode(code, selectedCode.name)
+                  return
+                }
+              }
               const name = prompt('请输入文件名:')
               if (name) saveCode(code, name)
             }}>保存代码</button>
@@ -306,21 +371,63 @@ function App() {
             <button onClick={runCode} disabled={isExecuting}>
               {isExecuting ? `执行中 (${executionProgress}%)` : '运行代码'}
             </button>
+            <button onClick={() => {
+              if (!selectedCodeId) {
+                alert('请先选择一个文件')
+                return
+              }
+              const confirmDelete = window.confirm('确定要删除此文件吗？')
+              if (confirmDelete) {
+                axios.post('http://localhost:3000/kline/delete-code', { id: selectedCodeId })
+                  .then(() => {
+                    setSavedCodes(savedCodes.filter(c => c.id !== selectedCodeId))
+                    setSelectedCodeId(null)
+                    setCode('')
+                  })
+                  .catch(error => {
+                    console.error('Error deleting code:', error)
+                    alert('删除失败: ' + error.message)
+                  })
+              }
+            }}>
+              删除
+            </button>
           </div>
           <div className="code-editor">
-            <textarea
+            <Editor
               value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder='输入交易策略代码'
+              onValueChange={(code) => setCode(code)}
+              highlight={(code) => highlight(code, languages.javascript, 'javascript')}
+              padding={10}
+              style={{
+                fontFamily: '"Fira code", "Fira Mono", monospace',
+                fontSize: 14,
+                backgroundColor: '#f5f5f5',
+                minHeight: '300px',
+                borderRadius: '4px',
+                border: '1px solid #ddd'
+              }}
+              placeholder='输入交易策略代码...'
             />
           </div>
         </div>
       </div>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </div>
   )
 }
 
 export default App
-
-// 现在运行代码之后好像有点问题了怎么页面直接没了
-// 布局需要调整回去

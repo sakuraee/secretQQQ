@@ -122,4 +122,9 @@ export class KlineController {
   async getCode(@Param('id') id: string) {
     return this.klineService.getCode(id);
   }
+
+  @Post('delete-code')
+  async deleteCode(@Body() body: { id: string }) {
+    return this.klineService.deleteCode(body.id);
+  }
 }

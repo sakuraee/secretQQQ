@@ -401,6 +401,7 @@ export default function KLineChart({
           <Button onClick={handleCloseDialog}>关闭</Button>
         </DialogActions>
       </Dialog>
+
     </div>
   );
 }

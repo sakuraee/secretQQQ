@@ -272,4 +272,11 @@ export class KlineService {
       updatedAt: doc.updatedAt
     };
   }
+
+  async deleteCode(id: string) {
+    const db = this.client.db(DB_NAME);
+    const collection = db.collection('SavedCodes');
+    const result = await collection.deleteOne({ _id: new ObjectId(id) });
+    return result.deletedCount > 0;
+  }
 }
