@@ -108,7 +108,8 @@ function App() {
 
       worker.postMessage({
         code,
-        klineData
+        klineData,
+        initialAmount
       })
     } catch (error) {
       console.error('执行代码出错:', error)

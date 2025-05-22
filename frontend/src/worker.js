@@ -1,5 +1,5 @@
 self.onmessage = function(e) {
-  const { code, klineData } = e.data
+  const { code, klineData, initialAmount } = e.data
   const trades = []
   let currentPosition = null
   const executeUserCode = new Function('index', 'klineData',  code)
@@ -15,13 +15,19 @@ self.onmessage = function(e) {
           buyPrice: point.close,
           sellTime: null,
           sellPrice: null,
-          profit: null
+          profit: null,
+          currentMoney : null
         }
       } else if (result && result.action === 'sell' && currentPosition) {
         // 平仓
         currentPosition.sellTime = point.timestamp
         currentPosition.sellPrice = point.close
         currentPosition.profit = (currentPosition.sellPrice - currentPosition.buyPrice) / currentPosition.buyPrice *  100 
+        // TODO ：这里应该要加上手续费扣除
+        currentPosition.currentMoney = trades.length > 0 ? 
+        trades[trades.length - 1].currentMoney * ( 1 + currentPosition.profit / 100) : 
+        initialAmount * ( 1 + currentPosition.profit / 100)
+
         trades.push(currentPosition)
         currentPosition = null
       }

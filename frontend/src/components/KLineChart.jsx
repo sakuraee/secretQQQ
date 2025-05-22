@@ -36,7 +36,8 @@ export default function KLineChart({
     totalProfit: 0,
     winRate: 0,
     maxProfit: 0,
-    maxLoss: 0
+    maxLoss: 0,
+    buyAndHold : 0
   });
   const [uploadStatus, setUploadStatus] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -82,7 +83,6 @@ export default function KLineChart({
 
   const chartRef = useRef(null);
   const [timeRange, setTimeRange] = useState('');
-
   const [klineData, setKlineData] = useState([]);
 
   useEffect(() => {
@@ -90,17 +90,17 @@ export default function KLineChart({
       // 只统计已平仓的交易
       const closedTrades = propTrades.filter(trade => trade.sellTime && trade.sellPrice);
       
-      const totalProfit = closedTrades.reduce((sum, trade) => sum + (trade.profit || 0), 0);
+      const totalProfit = (closedTrades.at(-1).currentMoney / initialAmount - 1) * 100;
       const winCount = closedTrades.filter(trade => trade.profit > 0).length;
-      const maxProfit = Math.max(...closedTrades.map(trade => trade.profit || 0), 0);
-      const maxLoss = Math.min(...closedTrades.map(trade => trade.profit || 0), 0);
-
+      const maxLoss = (1 - closedTrades.sort((a,b)=>a.currentMoney - b.currentMoney )[0].currentMoney / initialAmount) * 100;
+      const buyAndHold = (klineData.at(-1).close / klineData[0].open ) * 100
+      console.log(klineData[0] , "buyAndHold")
       setTrades(propTrades);
       setSummary({
+        buyAndHold,
         totalTrades: closedTrades.length,
         totalProfit,
         winRate: closedTrades.length > 0 ? (winCount / closedTrades.length * 100) : 0,
-        maxProfit,
         maxLoss
       });
     }
@@ -122,7 +122,6 @@ export default function KLineChart({
         const response = await axios.get('http://localhost:3000/kline', {
           params
         });
-        
         const klineData = response.data;
         setKlineData(klineData); // 保存K线数据用于交易处理
         onKlineDataLoaded?.(klineData); // 通知父组件数据已加载
@@ -310,8 +309,8 @@ export default function KLineChart({
                 <TableCell>总交易次数</TableCell>
                 <TableCell>总收益率(%)</TableCell>
                 <TableCell>胜率(%)</TableCell>
-                <TableCell>最大盈利(%)</TableCell>
-                <TableCell>最大亏损(%)</TableCell>
+                <TableCell>最大回撤(%)</TableCell>
+                <TableCell>BUY & HOLD</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -319,8 +318,8 @@ export default function KLineChart({
                 <TableCell>{summary.totalTrades}</TableCell>
                 <TableCell>{summary.totalProfit.toFixed(2)}</TableCell>
                 <TableCell>{summary.winRate.toFixed(2)}</TableCell>
-                <TableCell>{summary.maxProfit.toFixed(2)}</TableCell>
                 <TableCell>{summary.maxLoss.toFixed(2)}</TableCell>
+                <TableCell>{summary.buyAndHold.toFixed(2)}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -338,6 +337,7 @@ export default function KLineChart({
                 <TableCell>卖出时间</TableCell>
                 <TableCell>卖出价</TableCell>
                 <TableCell>收益率(%)</TableCell>
+                <TableCell>当前账户</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -354,6 +354,7 @@ export default function KLineChart({
                     }}>
                       {isClosed ? trade.profit?.toFixed(2) : '-'}
                     </TableCell>
+                    <TableCell>{trade.currentMoney?.toFixed(4) || '-'}</TableCell>
                   </TableRow>
                 );
               })}
