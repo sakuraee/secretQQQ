@@ -92,7 +92,7 @@ export default function KLineChart({
     setPaginatedTrades(trades.slice(page * pageSize, (page + 1) * pageSize))
   }
   useEffect(() => {
-    if (propTrades && propTrades.length > 0) {
+    if (propTrades && propTrades.length > 0 && klineData.length > 0) {
       // 只统计已平仓的交易
       const closedTrades = propTrades.filter(trade => trade.sellTime && trade.sellPrice);
 
@@ -433,4 +433,5 @@ export default function KLineChart({
   );
 }
 
-// 首先需要优化样式，以及bug的兼容性 ，现在怎么一切换就炸了
+// 添加一下收益曲线罢 ，可以放到同一张图中
+// 尝试一下进行实际的部署，添加一个apiKey即可

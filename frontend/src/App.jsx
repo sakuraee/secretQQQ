@@ -6,7 +6,19 @@ import { highlight, languages } from 'prismjs'
 import 'prismjs/components/prism-javascript'
 import 'prismjs/themes/prism.css'
 import './App.css'
-import { Snackbar, Alert } from '@mui/material'
+import {
+  Snackbar,
+  Alert,
+  Box,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControlLabel,
+  Checkbox,
+  TextField,
+  Button
+} from '@mui/material'
 
 function App() {
   const [products, setProducts] = useState([])
@@ -42,18 +54,18 @@ function App() {
   }
 
   const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({...prev, open: false}))
+    setSnackbar(prev => ({ ...prev, open: false }))
   }
 
   const saveCode = async (code, name) => {
     try {
       // 检查同名文档
       const existingCode = savedCodes.find(c => c.name === name)
-      
+
       if (existingCode) {
         // 直接更新现有文档
-        await axios.post('http://localhost:3000/kline/save-code', { 
-          code, 
+        await axios.post('http://localhost:3000/kline/save-code', {
+          code,
           name,
           id: existingCode.id // 传递ID表示更新
         })
@@ -63,7 +75,7 @@ function App() {
         await axios.post('http://localhost:3000/kline/save-code', { code, name })
         showMessage('文档已保存')
       }
-      
+
       // 刷新列表
       const response = await axios.get('http://localhost:3000/kline/saved-codes')
       setSavedCodes(response.data)
@@ -148,7 +160,7 @@ function App() {
       setExecutionProgress(0)
 
       const worker = new Worker(new URL('./worker.js', import.meta.url))
-      
+
       worker.onmessage = (e) => {
         if (e.data.type === 'progress') {
           setExecutionProgress(e.data.progress)
@@ -184,10 +196,10 @@ function App() {
           axios.get('http://localhost:3000/kline/bars'),
           axios.get('http://localhost:3000/kline/saved-codes')
         ])
-        
+
         setSavedCodes(codesRes.data)
         setTimeScales(scalesRes.data)
-        
+
         const productsData = await productsRes.json()
         setProducts(productsData)
         if (productsData.length > 0) {
@@ -218,16 +230,16 @@ function App() {
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (!isDragging) return
-      
+
       const containerRect = splitContainerRef.current.getBoundingClientRect()
       const containerWidth = containerRect.width
       const newLeftWidth = (e.clientX - containerRect.left) / containerWidth * 100
-      
+
       // 限制最小宽度
       const minWidth = 20
       const maxWidth = 80
       const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newLeftWidth))
-      
+
       leftPanelRef.current.style.flex = `0 0 ${clampedWidth}%`
     }
 
@@ -257,71 +269,90 @@ function App() {
           <div className="top-section">
             <h2>交易收益明细</h2>
             <div className="controls">
-              <select 
-                value={product} 
-                onChange={(e) => setProduct(e.target.value)}
-              >
-                {products.map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-              
-              <label>
-                <input
-                  type="checkbox"
-                  checked={isReal}
-                  onChange={(e) => setIsReal(e.target.checked)}
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>产品选择</InputLabel>
+                  <Select
+                    value={product}
+                    onChange={(e) => setProduct(e.target.value)}
+                    label="产品选择"
+                  >
+                    {products.map(p => (
+                      <MenuItem key={p} value={p}>{p}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={isReal}
+                      onChange={(e) => setIsReal(e.target.checked)}
+                    />
+                  }
+                  label="实盘数据"
                 />
-                实盘数据
-              </label>
 
-              <select
-                value={timeScale}
-                onChange={(e) => setTimeScale(e.target.value)}
-              >
-                <option value="">选择时间尺度</option>
-                {timeScales.map(scale => (
-                  <option key={scale} value={scale}>{scale}</option>
-                ))}
-              </select>
+                <FormControl fullWidth size="small">
+                  <InputLabel>时间尺度</InputLabel>
+                  <Select
+                    value={timeScale}
+                    onChange={(e) => setTimeScale(e.target.value)}
+                    label="时间尺度"
+                  >
+                    <MenuItem value="">选择时间尺度</MenuItem>
+                    {timeScales.map(scale => (
+                      <MenuItem key={scale} value={scale}>{scale}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
 
-              <div>
-                <label>开始时间: 
-                  <input
-                    type="datetime-local"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                  />
-                </label>
-              </div>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+                <TextField
+                  label="开始时间"
+                  type="datetime-local"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  size="small"
+                  fullWidth
+                />
 
-              <div>
-                <label>结束时间: 
-                  <input
-                    type="datetime-local"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                  />
-                </label>
-              </div>
+                <TextField
+                  label="结束时间"
+                  type="datetime-local"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  size="small"
+                  fullWidth
+                />
 
-              <div>
-                <label>初始金额: 
-                  <input
-                    type="number"
-                    value={initialAmount}
-                    onChange={(e) => setInitialAmount(Number(e.target.value))}
-                  />
-                </label>
-              </div>
+                <TextField
+                  label="初始金额"
+                  type="number"
+                  value={initialAmount}
+                  onChange={(e) => setInitialAmount(Number(e.target.value))}
+                  size="small"
+                  fullWidth
+                />
+                <Button
+                  variant="contained"
+                  onClick={handleQuery}
+                  fullWidth
+                >
+                  查询
+                </Button>
+              </Box>
 
-              <button onClick={handleQuery}>查询</button>
+
             </div>
           </div>
-          
+
           <div className="bottom-section">
-            <KLineChart 
-              product={product} 
+            <KLineChart
+              product={product}
               timeScale={timeScale}
               startTime={startTime}
               endTime={endTime}
@@ -333,12 +364,12 @@ function App() {
             />
           </div>
         </div>
-        
-        
+
+
         <div className="right-panel" ref={leftPanelRef}>
           <h1>代码编辑器</h1>
           <div className="code-actions">
-            <select 
+            <select
               onChange={(e) => loadCode(e.target.value)}
               style={{ padding: '8px', borderRadius: '4px' }}
             >
@@ -418,8 +449,8 @@ function App() {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
+        <Alert
+          onClose={handleCloseSnackbar}
           severity={snackbar.severity}
           sx={{ width: '100%' }}
         >
