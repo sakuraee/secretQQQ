@@ -2,34 +2,46 @@ self.onmessage = function(e) {
   const { code, klineData, initialAmount } = e.data
   const trades = []
   let currentPosition = null
-  const executeUserCode = new Function('index', 'klineData', 'currentHold',  code)
+  const executeUserCode = new Function('index', 'klineData', 'currentPosition', 'lastTrade', code )
   
   klineData.forEach((point, index) => {
     try {
-      const result = executeUserCode(index, klineData , currentPosition !== null)
+      const result = executeUserCode(index, klineData , currentPosition  , trades.at(-1) || {} )
 
-      if (result && result.action === 'buy' && !currentPosition) {
+      if (result && result.action && !currentPosition) {
         // 开仓
         currentPosition = {
-          buyTime: point.timestamp,
-          buyPrice: point.close,
-          sellTime: null,
-          sellPrice: null,
+          type: result.action, // 'buy' or 'sell'
+          openTime: point.timestamp,
+          openPrice: point.close,
+          closeTime: null,
+          closePrice: null,
           profit: null,
-          currentMoney : null
+          currentMoney: null,
+          tradeAmount: result.amount , // 使用传入的金额或默认初始金额
+          message: result.message
         }
-      } else if (result && result.action === 'sell' && currentPosition) {
-        // 平仓
-        currentPosition.sellTime = point.timestamp
-        currentPosition.sellPrice = point.close
-        currentPosition.profit = (currentPosition.sellPrice - currentPosition.buyPrice) / currentPosition.buyPrice *  100 
-        // TODO ：这里应该要加上手续费扣除
-        currentPosition.currentMoney = trades.length > 0 ? 
-        trades[trades.length - 1].currentMoney * ( 1 + currentPosition.profit / 100) : 
-        initialAmount * ( 1 + currentPosition.profit / 100)
+      } else if (result && result.action && currentPosition) {
+        // 平仓 - 做多平仓是sell，做空平仓是buy
+        if ((currentPosition.type === 'buy' && result.action === 'sell') || 
+            (currentPosition.type === 'sell' && result.action === 'buy')) {
+          
+          currentPosition.closeTime = point.timestamp
+          currentPosition.closePrice = point.close
+          currentPosition.message += " // " + result.message
+          // 利润计算：做多=(平仓价-开仓价)/开仓价，做空=(开仓价-平仓价)/开仓价
+          currentPosition.profit = currentPosition.type === 'buy' 
+            ? (currentPosition.closePrice - currentPosition.openPrice) / currentPosition.openPrice * 100
+            : (currentPosition.openPrice - currentPosition.closePrice) / currentPosition.openPrice * 100
+          
+          // TODO ：这里应该要加上手续费扣除
+          currentPosition.currentMoney = trades.length > 0 
+            ? trades[trades.length - 1].currentMoney + (currentPosition.tradeAmount * currentPosition.profit / 100)
+            : initialAmount + (currentPosition.tradeAmount * currentPosition.profit / 100)
 
-        trades.push(currentPosition)
-        currentPosition = null
+          trades.push(currentPosition)
+          currentPosition = null
+        }
       }
     } catch (err) {
       console.error(`执行用户代码出错(时间点: ${point.timestamp}):`, err)
@@ -48,7 +60,11 @@ self.onmessage = function(e) {
   if (currentPosition) {
     trades.push({
       ...currentPosition,
-      status: '未平仓'
+      status: '未平仓',
+      // 计算浮动盈亏
+      floatingProfit: currentPosition.type === 'buy'
+        ? (klineData[klineData.length - 1].close - currentPosition.openPrice) / currentPosition.openPrice * 100
+        : (currentPosition.openPrice - klineData[klineData.length - 1].close) / currentPosition.openPrice * 100
     })
   }
 

@@ -149,6 +149,28 @@ function App() {
 
   const [klineData, setKlineData] = useState([])
 
+  const fetchKlineData = async () => {
+    try {
+      const params = {
+        product,
+        isReal
+      }
+      if (timeScale) params.bar = timeScale
+      if (startTime) params.startTime = new Date(startTime).toISOString()
+      if (endTime) params.endTime = new Date(endTime).toISOString()
+
+      const response = await axios.get('http://localhost:3000/kline', {
+        params
+      })
+      const data = response.data
+      setKlineData(data)
+      return data
+    } catch (error) {
+      console.error('Error fetching kline data:', error)
+      throw error
+    }
+  }
+
   const runCode = async () => {
     try {
       if (!klineData.length) {
@@ -214,9 +236,12 @@ function App() {
     fetchInitialData()
   }, [])
 
-  const handleQuery = () => {
-    // 触发KLineChart重新加载数据
-    setKlineData([])
+  const handleQuery = async () => {
+    try {
+      await fetchKlineData()
+    } catch (error) {
+      console.error('Failed to fetch kline data:', error)
+    }
   }
 
   const parsedTrades = useMemo(() => {
@@ -359,7 +384,7 @@ function App() {
               isReal={isReal}
               trades={parsedTrades}
               initialAmount={initialAmount}
-              onKlineDataLoaded={setKlineData}
+              klineData={klineData}
               key={`${product}-${timeScale}-${startTime}-${endTime}-${isReal}`}
             />
           </div>
@@ -462,3 +487,6 @@ function App() {
 }
 
 export default App
+
+// TODO 可以针对多个产品一起进行下单 的 处理
+// 加上依次往下展示多个产品的图表之类的，并且展示一下整体的收益之类的，在k线上展示哪里买哪里卖

@@ -28,7 +28,7 @@ export default function KLineChart({
   endTime,
   trades: propTrades = [],
   initialAmount = 10000,
-  onKlineDataLoaded
+  klineData = []
 }) {
   const [trades, setTrades] = useState(propTrades);
   const [paginatedTrades, setPaginatedTrades] = useState([]);
@@ -72,7 +72,6 @@ export default function KLineChart({
       setUploadResult(response.data.data);
       setOpenDialog(true);
       setFile(null);
-      // 清空文件输入
       document.getElementById('file-upload').value = '';
     } catch (error) {
       setUploadStatus('上传失败: ' + error.message);
@@ -86,23 +85,21 @@ export default function KLineChart({
 
   const chartRef = useRef(null);
   const [timeRange, setTimeRange] = useState('');
-  const [klineData, setKlineData] = useState([]);
   const changePage = (target) => {
-    setPage(p => p + target)
-    setPaginatedTrades(trades.slice(page * pageSize, (page + 1) * pageSize))
-  }
-  useEffect(() => {
-    if (propTrades && propTrades.length > 0 && klineData.length > 0) {
-      // 只统计已平仓的交易
-      const closedTrades = propTrades.filter(trade => trade.sellTime && trade.sellPrice);
+    setPage(p => p + target);
+    setPaginatedTrades(trades.slice(page * pageSize, (page + 1) * pageSize));
+  };
 
-      const totalProfit = (closedTrades.at(-1).currentMoney / initialAmount - 1) * 100;
+  useEffect(() => {
+    if (propTrades && propTrades.length > 1 && klineData.length > 0) {
+      const closedTrades = propTrades.filter(trade => trade.closeTime && trade.closePrice);
+      const totalProfit = ((closedTrades[closedTrades.length - 1]?.currentMoney || initialAmount) / initialAmount - 1) * 100;
       const winCount = closedTrades.filter(trade => trade.profit > 0).length;
       const maxLoss = (1 - closedTrades.sort((a, b) => a.currentMoney - b.currentMoney)[0].currentMoney / initialAmount) * 100;
-      const buyAndHold = (klineData.at(-1).close / klineData[0].open - 1 ) * 100
-      console.log(klineData[0], "buyAndHold")
+      const buyAndHold = (klineData.at(-1).close / klineData[0].open - 1 ) * 100;
+
       setTrades(propTrades);
-      setPaginatedTrades(propTrades.slice(0,pageSize))
+      setPaginatedTrades(propTrades.slice(0,pageSize));
       setSummary({
         buyAndHold,
         totalTrades: closedTrades.length,
@@ -111,136 +108,118 @@ export default function KLineChart({
         maxLoss
       });
     }
-  }, [propTrades]);
+  }, [propTrades, klineData, initialAmount]);
 
   useEffect(() => {
-    const chart = echarts.init(chartRef.current);
+    let chart;
+    try {
+      chart = echarts.init(chartRef.current);
+    } catch (err) {
+      console.error('Failed to initialize chart:', err);
+      return;
+    }
 
-    const fetchData = async () => {
-      try {
-        const params = {
-          product,
-          isReal
-        };
-        if (timeScale) params.bar = timeScale;
-        if (startTime) params.startTime = new Date(startTime).toISOString();
-        if (endTime) params.endTime = new Date(endTime).toISOString();
-
-        const response = await axios.get('http://localhost:3000/kline', {
-          params
-        });
-        const klineData = response.data;
-        setKlineData(klineData); // 保存K线数据用于交易处理
-        onKlineDataLoaded?.(klineData); // 通知父组件数据已加载
-        const dates = klineData.map(item => new Date(item.timestamp));
-
-        if (dates.length > 0) {
-          setTimeRange(`${dates[0].toLocaleString()} - ${dates[dates.length - 1].toLocaleString()}`);
-        }
-
-        // 计算y轴范围
-        const allValues = klineData.flatMap(item => [item.open, item.close, item.low, item.high]);
-        const minVal = Math.min(...allValues);
-        const maxVal = Math.max(...allValues);
-        // 10% padding (计算但不使用，保留计算逻辑)
-        const _padding = (maxVal - minVal) * 0.1;
-
-        const option = {
-          title: {
-            text: `${product} ${timeScale || ''} K线图 (${isReal ? '实盘' : '模拟'})`,
-            subtext: `数据时间范围: ${timeRange}`,
-            left: 'center'
-          },
-          tooltip: {
-            trigger: 'axis',
-            axisPointer: {
-              type: 'cross'
-            }
-          },
-          xAxis: {
-            type: 'category',
-            data: dates.map(d => d.toLocaleString()),
-            axisPointer: {
-              snap: true
-            }
-          },
-          yAxis: {
-            type: 'value',
-            scale: true,
-            boundaryGap: [0.1, 0.1]
-          },
-          dataZoom: [
-            {
-              type: 'inside',
-              start: 0,
-              end: 100
-            },
-            {
-              start: 0,
-              end: 100
-            }
-          ],
-          toolbox: {
-            feature: {
-              dataZoom: {
-                yAxisIndex: 'none'
-              },
-              restore: {},
-              saveAsImage: {}
-            }
-          },
-          series: [{
-            type: 'candlestick',
-            data: klineData.map(item => [
-              item.open,
-              item.close,
-              item.low,
-              item.high
-            ]),
-            itemStyle: {
-              color: '#ef232a',
-              color0: '#14b143',
-              borderColor: '#ef232a',
-              borderColor0: '#14b143'
-            }
-          }]
-        };
-
-        chart.setOption(option);
-
-        const handleDataZoom = debounce(function () {
-          setIsLoading(true);
-
-          const option = chart.getOption();
-          const startValue = option.dataZoom[0].startValue;
-          const endValue = option.dataZoom[0].endValue;
-
-          const visibleData = klineData.slice(startValue, endValue + 1);
-          const visibleValues = visibleData.flatMap(item => [item.open, item.close, item.low, item.high]);
-          const visibleMin = Math.min(...visibleValues);
-          const visibleMax = Math.max(...visibleValues);
-          const visiblePadding = (visibleMax - visibleMin) * 0.1;
-
-          chart.setOption({
-            yAxis: {
-              min: visibleMin - visiblePadding,
-              max: visibleMax + visiblePadding
-            }
-          }, { silent: true });
-
-          setIsLoading(false);
-        }, 300);
-
-        chart.on('dataZoom', handleDataZoom);
-      } catch (error) {
-        console.error('Error fetching kline data:', error);
+    if (klineData && klineData.length > 0 && chartRef.current) {
+      const dates = klineData.map(item => new Date(item.timestamp));
+      if (dates.length > 0) {
+        setTimeRange(`${dates[0].toLocaleString()} - ${dates[dates.length - 1].toLocaleString()}`);
       }
-    };
 
-    fetchData();
+      const allValues = klineData.flatMap(item => [item.open, item.close, item.low, item.high]);
+      const minVal = Math.min(...allValues);
+      const maxVal = Math.max(...allValues);
+      const _padding = (maxVal - minVal) * 0.1;
+
+      const option = {
+        title: {
+          text: `${product} ${timeScale || ''} K线图 (${isReal ? '实盘' : '模拟'})`,
+          subtext: `数据时间范围: ${timeRange}`,
+          left: 'center'
+        },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: {
+            type: 'cross'
+          }
+        },
+        xAxis: {
+          type: 'category',
+          data: dates.map(d => d.toLocaleString()),
+          axisPointer: {
+            snap: true
+          }
+        },
+        yAxis: {
+          type: 'value',
+          scale: true,
+          boundaryGap: [0.1, 0.1]
+        },
+        dataZoom: [
+          {
+            type: 'inside',
+            start: 0,
+            end: 100
+          },
+          {
+            start: 0,
+            end: 100
+          }
+        ],
+        toolbox: {
+          feature: {
+            dataZoom: {
+              yAxisIndex: 'none'
+            },
+            restore: {},
+            saveAsImage: {}
+          }
+        },
+        series: [{
+          type: 'candlestick',
+          data: klineData.map(item => [
+            item.open,
+            item.close,
+            item.low,
+            item.high
+          ]),
+          itemStyle: {
+            color: '#ef232a',
+            color0: '#14b143',
+            borderColor: '#ef232a',
+            borderColor0: '#14b143'
+          }
+        }]
+      };
+
+      chart.setOption(option);
+
+      const handleDataZoom = debounce(function () {
+        setIsLoading(true);
+        const option = chart.getOption();
+        const startValue = option.dataZoom[0].startValue;
+        const endValue = option.dataZoom[0].endValue;
+
+        const visibleData = klineData.slice(startValue, endValue + 1);
+        const visibleValues = visibleData.flatMap(item => [item.open, item.close, item.low, item.high]);
+        const visibleMin = Math.min(...visibleValues);
+        const visibleMax = Math.max(...visibleValues);
+        const visiblePadding = (visibleMax - visibleMin) * 0.1;
+
+        chart.setOption({
+          yAxis: {
+            min: visibleMin - visiblePadding,
+            max: visibleMax + visiblePadding
+          }
+        }, { silent: true });
+
+        setIsLoading(false);
+      }, 300);
+
+      chart.on('dataZoom', handleDataZoom);
+    }
 
     return () => chart.dispose();
-  }, [product, isReal, timeRange]);
+  }, [klineData, product, isReal, timeScale]);
 
   return (
     <div style={{ width: '100%', display: 'flex', gap: '20px' }}>
@@ -358,10 +337,12 @@ export default function KLineChart({
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell>买入时间</TableCell>
-                  <TableCell>买入价</TableCell>
-                  <TableCell>卖出时间</TableCell>
-                  <TableCell>卖出价</TableCell>
+                  <TableCell>类型</TableCell>
+                  <TableCell>开仓时间</TableCell>
+                  <TableCell>开仓价</TableCell>
+                  <TableCell>平仓时间</TableCell>
+                  <TableCell>平仓价</TableCell>
+                  <TableCell>交易金额</TableCell>
                   <TableCell>收益率(%)</TableCell>
                   <TableCell>当前账户</TableCell>
                   <TableCell>信息</TableCell>
@@ -369,13 +350,15 @@ export default function KLineChart({
               </TableHead>
               <TableBody>
                 {paginatedTrades.map((trade, index) => {
-                  const isClosed = trade.sellTime && trade.sellPrice;
+                  const isClosed = trade.closeTime && trade.closePrice;
                   return (
                     <TableRow key={index}>
-                      <TableCell>{new Date(trade.buyTime).toLocaleString()}</TableCell>
-                      <TableCell>{trade.buyPrice?.toFixed(4) || '-'}</TableCell>
-                      <TableCell>{trade.sellTime ? new Date(trade.sellTime).toLocaleString() : '未平仓'}</TableCell>
-                      <TableCell>{trade.sellPrice?.toFixed(4) || '-'}</TableCell>
+                      <TableCell>{trade.type === 'buy' ? '做多' : '做空'}</TableCell>
+                      <TableCell>{new Date(trade.openTime).toLocaleString()}</TableCell>
+                      <TableCell>{trade.openPrice?.toFixed(4) || '-'}</TableCell>
+                      <TableCell>{trade.closeTime ? new Date(trade.closeTime).toLocaleString() : '未平仓'}</TableCell>
+                      <TableCell>{trade.closePrice?.toFixed(4) || '-'}</TableCell>
+                      <TableCell>{trade.tradeAmount?.toFixed(4) || '-'}</TableCell>
                       <TableCell style={{
                         color: isClosed ? (trade.profit >= 0 ? 'green' : 'red') : 'inherit'
                       }}>
@@ -432,6 +415,3 @@ export default function KLineChart({
     </div>
   );
 }
-
-// 添加一下收益曲线罢 ，可以放到同一张图中
-// 尝试一下进行实际的部署，添加一个apiKey即可
