@@ -1,16 +1,31 @@
 self.onmessage = function(e) {
-  const { code, klineData, initialAmount } = e.data
+  const { code, klineData: allKlineData, initialAmount } = e.data
   const trades = []
   let currentPosition = null
   const executeUserCode = new Function('index', 'klineData', 'currentPosition', 'lastTrade', code )
   
-  klineData.forEach((point, index) => {
+  // 获取所有时间点
+  const allPoints = []
+  for (const [product, klineData] of Object.entries(allKlineData)) {
+    klineData.forEach(point => {
+      allPoints.push({...point, product})
+    })
+  }
+  
+  // 按时间排序
+  allPoints.sort((a, b) => a.timestamp - b.timestamp)
+  
+  // 按时间点处理
+  allPoints.forEach((point, index) => {
+    // 如果有持仓且不是当前产品则跳过其他产品检查
+    if (currentPosition && point.product !== currentPosition.product) return
     try {
-      const result = executeUserCode(index, klineData , currentPosition  , trades.at(-1) || {} )
+      const result = executeUserCode(index, allKlineData[point.product], currentPosition, trades.at(-1) || {})
 
       if (result && result.action && !currentPosition) {
         // 开仓
         currentPosition = {
+          product: point.product, // 记录当前持仓产品
           type: result.action, // 'buy' or 'sell'
           openTime: point.timestamp,
           openPrice: point.close,
@@ -48,23 +63,26 @@ self.onmessage = function(e) {
     }
 
     // 每处理100个数据点发送一次进度
+    // 进度报告
     if (index % 100 === 0) {
       self.postMessage({
         type: 'progress',
-        progress: Math.floor((index / klineData.length) * 100)
+        progress: Math.floor((index / allPoints.length) * 100)
       })
     }
   })
 
   // 处理未平仓的头寸
   if (currentPosition) {
+    // 获取当前产品的k线数据
+    const currentProductData = allKlineData[currentPosition.product] || []
     trades.push({
       ...currentPosition,
       status: '未平仓',
       // 计算浮动盈亏
       floatingProfit: currentPosition.type === 'buy'
-        ? (klineData[klineData.length - 1].close - currentPosition.openPrice) / currentPosition.openPrice * 100
-        : (currentPosition.openPrice - klineData[klineData.length - 1].close) / currentPosition.openPrice * 100
+        ? (currentProductData[currentProductData.length - 1].close - currentPosition.openPrice) / currentPosition.openPrice * 100
+        : (currentPosition.openPrice - currentProductData[currentProductData.length - 1].close) / currentPosition.openPrice * 100
     })
   }
 

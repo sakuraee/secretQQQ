@@ -7,7 +7,7 @@ async function bootstrap() {
   
   // Enable CORS for frontend development server
   app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: 'http://localhost:5174',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: 'Content-Type,Accept',
     credentials: true
@@ -15,7 +15,7 @@ async function bootstrap() {
 
   // Initialize database on startup
   const taskService = app.get(TaskService);
-  await taskService.initDatabase();
+  // await taskService.initDatabase();
 
   await app.listen(process.env.PORT ?? 3000);
 }

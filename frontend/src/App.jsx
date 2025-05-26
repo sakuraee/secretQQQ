@@ -45,6 +45,12 @@ function App() {
   const splitContainerRef = useRef(null)
   const leftPanelRef = useRef(null)
 
+  const [selectedProducts, setSelectedProducts] = useState([]) // 存储格式: {product: string, timeScale: string}
+  const [allKlineData, setAllKlineData] = useState({})
+
+
+  // 初始化数据
+  
   const showMessage = (message, severity = 'success') => {
     setSnackbar({
       open: true,
@@ -149,31 +155,9 @@ function App() {
 
   const [klineData, setKlineData] = useState([])
 
-  const fetchKlineData = async () => {
-    try {
-      const params = {
-        product,
-        isReal
-      }
-      if (timeScale) params.bar = timeScale
-      if (startTime) params.startTime = new Date(startTime).toISOString()
-      if (endTime) params.endTime = new Date(endTime).toISOString()
-
-      const response = await axios.get('http://localhost:3000/kline', {
-        params
-      })
-      const data = response.data
-      setKlineData(data)
-      return data
-    } catch (error) {
-      console.error('Error fetching kline data:', error)
-      throw error
-    }
-  }
-
   const runCode = async () => {
     try {
-      if (!klineData.length) {
+      if (!allKlineData) {
         alert('请等待K线数据加载完成')
         return
       }
@@ -197,7 +181,7 @@ function App() {
           setIsExecuting(false)
         }
       }
-
+      console.log(allKlineData)
       worker.postMessage({
         code,
         klineData,
@@ -236,52 +220,48 @@ function App() {
     fetchInitialData()
   }, [])
 
-  const handleQuery = async () => {
+  // 添加产品图表
+  const handleAddProduct = async () => {
+    if (!product) return
+    
     try {
-      await fetchKlineData()
+      // 获取K线数据
+      const params = {
+        product,
+        isReal
+      }
+      if (timeScale) params.bar = timeScale
+      if (startTime) params.startTime = new Date(startTime).toISOString()
+      if (endTime) params.endTime = new Date(endTime).toISOString()
+
+      const response = await axios.get('http://localhost:3000/kline', { params })
+      const data = response.data
+
+      // 更新状态
+      setSelectedProducts([...selectedProducts, {product, timeScale}])
+      setAllKlineData(prev => ({...prev, [`${product}`]: data}))
+
+      // 清空当前选择
+      setProduct('')
+      setTimeScale('')
+      setStartTime('')
+      setEndTime('')
     } catch (error) {
-      console.error('Failed to fetch kline data:', error)
+      console.error('添加产品失败:', error)
     }
   }
 
-  const parsedTrades = useMemo(() => {
-    try {
-      return JSON.parse(trades)
-    } catch {
-      return []
-    }
-  }, [trades])
+  // 移除产品
+  const handleRemoveProduct = (index) => {
+    const newSelectedProducts = [...selectedProducts]
+    newSelectedProducts.splice(index, 1)
+    setSelectedProducts(newSelectedProducts)
 
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (!isDragging) return
+    const newAllKlineData = {...allKlineData}
+    delete newAllKlineData[selectedProducts[index].product]
+    setAllKlineData(newAllKlineData)
+  }
 
-      const containerRect = splitContainerRef.current.getBoundingClientRect()
-      const containerWidth = containerRect.width
-      const newLeftWidth = (e.clientX - containerRect.left) / containerWidth * 100
-
-      // 限制最小宽度
-      const minWidth = 20
-      const maxWidth = 80
-      const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newLeftWidth))
-
-      leftPanelRef.current.style.flex = `0 0 ${clampedWidth}%`
-    }
-
-    const handleMouseUp = () => {
-      setIsDragging(false)
-    }
-
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isDragging])
 
   if (loading) {
     return <div className="app">Loading...</div>
@@ -296,11 +276,11 @@ function App() {
             <div className="controls">
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>产品选择</InputLabel>
+                  <InputLabel>产品</InputLabel>
                   <Select
                     value={product}
                     onChange={(e) => setProduct(e.target.value)}
-                    label="产品选择"
+                    label="产品"
                   >
                     {products.map(p => (
                       <MenuItem key={p} value={p}>{p}</MenuItem>
@@ -331,9 +311,7 @@ function App() {
                     ))}
                   </Select>
                 </FormControl>
-              </Box>
 
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
                 <TextField
                   label="开始时间"
                   type="datetime-local"
@@ -364,10 +342,11 @@ function App() {
                 />
                 <Button
                   variant="contained"
-                  onClick={handleQuery}
+                  onClick={handleAddProduct}
                   fullWidth
+                  disabled={!product}
                 >
-                  查询
+                  添加产品图表
                 </Button>
               </Box>
 
@@ -376,22 +355,31 @@ function App() {
           </div>
 
           <div className="bottom-section">
-            <KLineChart
-              product={product}
-              timeScale={timeScale}
-              startTime={startTime}
-              endTime={endTime}
-              isReal={isReal}
-              trades={parsedTrades}
-              initialAmount={initialAmount}
-              klineData={klineData}
-              key={`${product}-${timeScale}-${startTime}-${endTime}-${isReal}`}
-            />
-          </div>
-        </div>
-
-
-        <div className="right-panel" ref={leftPanelRef}>
+            {selectedProducts.map((product, index) => (
+              <div key={`${product}-${index}`} style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3>{product.product} ({product.timeScale || '默认'}) K线图</h3>
+                  <Button 
+                    variant="outlined" 
+                    color="error"
+                    size="small"
+                    onClick={() => handleRemoveProduct(index)}
+                  >
+                    移除
+                  </Button>
+                </div>
+                <KLineChart 
+                  product={product.product}
+                  timeScale={timeScale}
+                  isReal={isReal}
+                  klineData={allKlineData[product.product] || []}
+                  key={`${product.product}-${product.timeScale}-${isReal}`}
+                />
+              </div>
+            ))}
+            </div>
+      </div>
+      <div className="right-panel" ref={leftPanelRef}>
           <h1>代码编辑器</h1>
           <div className="code-actions">
             <select
@@ -467,7 +455,6 @@ function App() {
             />
           </div>
         </div>
-      </div>
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
@@ -482,11 +469,9 @@ function App() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+      </div>
     </div>
   )
 }
 
 export default App
-
-// TODO 可以针对多个产品一起进行下单 的 处理
-// 加上依次往下展示多个产品的图表之类的，并且展示一下整体的收益之类的，在k线上展示哪里买哪里卖

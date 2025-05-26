@@ -1,12 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MongoClient, ObjectId } from 'mongodb';
-import axios from 'axios';
-import * as CryptoJS from 'crypto-js';
 
-import * as fs from 'fs';
-import { promisify } from 'util';
-
-const readFile = promisify(fs.readFile);
 const DB_URL = process.env.DATABASE_URL || 'mongodb://localhost:27017';
 const DB_NAME = 'crypto_web';
 
@@ -139,7 +133,7 @@ export class KlineService {
     isReal?: boolean,
     startTime?: Date,
     endTime?: Date,
-    bar? :string 
+    bar?: string,
   ) {
     const db = this.client.db(DB_NAME);
     const collection = db.collection('KLineData');
@@ -195,15 +189,15 @@ export class KlineService {
 
     const db = this.client.db(DB_NAME);
     const collection = db.collection('SavedCodes');
-    
+
     // 检查同名文档是否存在
     const existingDoc = await collection.findOne({ name });
-    
+
     if (existingDoc) {
       // 更新现有文档
       const result = await collection.updateOne(
         { _id: existingDoc._id },
-        { $set: { code, updatedAt: new Date() } }
+        { $set: { code, updatedAt: new Date() } },
       );
       return existingDoc._id.toString();
     } else {
@@ -212,7 +206,7 @@ export class KlineService {
         name,
         code,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
       const result = await collection.insertOne(doc);
       return result.insertedId.toString();
@@ -224,11 +218,10 @@ export class KlineService {
     const collection = db.collection('SavedCodes');
     const result = await collection.updateOne(
       { _id: new ObjectId(id) },
-      { $set: { name: newName, updatedAt: new Date() } }
+      { $set: { name: newName, updatedAt: new Date() } },
     );
     return result.modifiedCount > 0;
   }
-
 
   async getSavedCodes() {
     const db = this.client.db(DB_NAME);
@@ -239,7 +232,7 @@ export class KlineService {
       name: doc.name,
       code: doc.code,
       createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt
+      updatedAt: doc.updatedAt,
     }));
   }
 
@@ -255,7 +248,7 @@ export class KlineService {
       name: doc.name,
       code: doc.code,
       createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt
+      updatedAt: doc.updatedAt,
     };
   }
 
@@ -265,7 +258,6 @@ export class KlineService {
     const result = await collection.deleteOne({ _id: new ObjectId(id) });
     return result.deletedCount > 0;
   }
-
 }
 
 // TODO 程序启动的时候自动获取一变所有品类的交易数据 并且每 5min 更新一次 顶多也就 (BTC-SWAP ,ETH-SWAP ,SOL-SWAP , LTC-SWAP , XRP-SWAP ) * （ 1h ,15m ,5m ） 的数据罢
