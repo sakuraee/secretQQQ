@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { TaskService } from './task.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -11,6 +12,10 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type,Accept',
     credentials: true
   });
+
+  // Initialize database on startup
+  const taskService = app.get(TaskService);
+  await taskService.initDatabase();
 
   await app.listen(process.env.PORT ?? 3000);
 }
