@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import axios from 'axios'
+import { Typography } from '@mui/material'
 import KLineChart from './components/KLineChart'
 import Editor from 'react-simple-code-editor'
 import { highlight, languages } from 'prismjs'
@@ -30,7 +31,23 @@ import {
 } from '@mui/material'
 
 function App() {
+  const [monitorStatus, setMonitorStatus] = useState('unknown') // 'running'|'exited'|'terminated'|'not-running'|'unknown'
   const [products, setProducts] = useState([])
+
+  // 轮询监控状态
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await axios.get('http://localhost:3000/process/data-monitor/status')
+        setMonitorStatus(response.data.status)
+      } catch (error) {
+        console.error('Error fetching monitor status:', error)
+        setMonitorStatus('unknown')
+      }
+    }, 5000) // 每5秒检查一次
+
+    return () => clearInterval(interval)
+  }, [])
   const [timeScales, setTimeScales] = useState([])
   const [product, setProduct] = useState('')
   const [timeScale, setTimeScale] = useState('')
@@ -277,6 +294,27 @@ function App() {
 
   return (
     <div className="app">
+      <Box sx={{
+        position: 'fixed',
+        top: 16,
+        right: 16,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        backgroundColor: 'background.paper',
+        padding: '8px 16px',
+        borderRadius: 1,
+        boxShadow: 1,
+        zIndex: 1000
+      }}>
+        <Box sx={{
+          width: 12,
+          height: 12,
+          borderRadius: '50%',
+          backgroundColor: monitorStatus === 'running' ? 'success.main' : 'error.main'
+        }} />
+        <Typography variant="body2">数据监控中</Typography>
+      </Box>
       <div className="split-container" ref={splitContainerRef}>
         <div className="left-panel">
           <div className="top-section">
@@ -466,7 +504,7 @@ function App() {
               if (newName) renameCode(selectedCodeId, newName)
             }}>重命名</button>
             <button onClick={runCode} disabled={isExecuting}>
-              {isExecuting ? `执行中 (${executionProgress}%)` : '运行代码'}
+              {isExecuting ? `执行中 (${executionProgress}%)` : '回测代码'}
             </button>
             <button onClick={() => {
               if (!selectedCodeId) {

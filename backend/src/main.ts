@@ -4,19 +4,19 @@ import { TaskService } from './task.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   // Enable CORS for frontend development server
   app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: 'http://localhost:5174',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: 'Content-Type,Accept',
-    credentials: true
+    credentials: true,
   });
 
   // Initialize database on startup
   const taskService = app.get(TaskService);
-  //await taskService.initDatabase();
-
+  //taskService.data_monitor();
+  taskService.fetchCurrentOneData('BTC-USDT-SWAP', '15m');
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

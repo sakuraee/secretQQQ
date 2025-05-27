@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import * as CryptoJS from 'crypto-js';
 import { Db, MongoClient } from 'mongodb';
+import * as path from 'path';
 
 const DB_URL = process.env.DATABASE_URL || 'mongodb://localhost:27017';
 const DB_NAME = 'crypto_web';
@@ -112,6 +113,100 @@ export class TaskService {
     return res;
   }
 
+  async getIndexCandles(
+    instId: string,
+    after?: string,
+    before?: string,
+    bar?: string,
+    limit?: string,
+  ): Promise<{ code: string; msg: string; data: string[][] }> {
+    // 构建查询参数
+    const params = new URLSearchParams();
+    params.append('instId', instId);
+    if (after) params.append('after', after);
+    if (before) params.append('before', before);
+    if (bar) params.append('bar', bar);
+    if (limit) params.append('limit', limit);
+
+    const requestPath = `/api/v5/market/candles?${params.toString()}`;
+    const res = await this.sendSignedRequest('GET', requestPath);
+    return res;
+  }
+
+  async fetchCurrentOneData(instId: string, bar?: string) {
+    const res = await this.getIndexCandles(instId, undefined, undefined, bar);
+    console.log(res.data[0]);
+  }
+
+  async fetchCurrentData() {
+    const kLineDataCollection = this.db.collection('KLineData');
+    const instIds = [
+      'BTC-USDT-SWAP',
+      'ETH-USDT-SWAP',
+      'LTC-USDT-SWAP',
+      'SOL-USDT-SWAP',
+      'XRP-USDT-SWAP',
+      'BTC-USDT-SWAP',
+      'BNB-USDT-SWAP',
+      'DOGE-USDT-SWAP',
+      'ADA-USDT-SWAP',
+      'TRX-USDT-SWAP',
+      'DOGE-USDT-SWAP',
+    ];
+    const bars = ['15m', '1H'];
+    for (const instId of instIds) {
+      for (const bar of bars) {
+        const res = await this.getHistoryIndexCandles(
+          instId,
+          undefined,
+          undefined,
+          bar,
+        );
+        const documents = res.data
+          .map((item) => {
+            if (item[8] === '1')
+              return {
+                product: instId,
+                bar: bar,
+                timestamp: new Date(parseInt(item[0])),
+                open: parseFloat(item[1]),
+                high: parseFloat(item[2]),
+                low: parseFloat(item[3]),
+                close: parseFloat(item[4]),
+                vol: parseFloat(item[5]),
+                volCcy: parseFloat(item[6]),
+                volCcyQuote: parseFloat(item[7]),
+                isReal: true,
+              };
+          })
+          .filter((item) => item !== undefined);
+
+        if (documents.length > 0) {
+          try {
+            await kLineDataCollection.insertMany(documents);
+            console.log(`成功插入 ${documents.length} 条数据`);
+          } catch (err) {
+            console.error(`插入数据失败: ${err}, 重试中...`);
+            break;
+          }
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
+  data_monitor() {
+    setInterval(
+      () => {
+        console.log('开启定时获取');
+        this.fetchCurrentData();
+      },
+      1000 * 60 * 5,
+    );
+    this.fetchCurrentData();
+  }
+
   async sendSignedRequest(
     method: 'GET' | 'POST',
     requestPath: string,
@@ -174,4 +269,33 @@ export class TaskService {
       throw new Error(`API request failed: ${error.message}`);
     }
   }
+
+  async processSignal() {
+    const instIds = ['BTC-USDT-SWAP', 'ETH-USDT-SWAP'];
+    const bar = '1H';
+    for (const instId of instIds) {
+      const currentData = await this.fetchCurrentOneData(instId, bar);
+      const kLineDataCollection = this.db.collection('KLineData');
+      const latestData = await kLineDataCollection
+        .find({
+          product: instId,
+          bar: bar,
+        })
+        .sort({ timestamp: -1 })
+        .limit(100)
+        .toArray();
+
+      const kLineData = [...latestData, currentData[0]];
+      const worker = new Worker(path.resolve(__dirname, './worker.js'));
+
+      // 参照前端进行一直跑嘛，
+
+      // 然后接收信息，使用当前的一个价格进行下单
+
+      // 将整个流程进行记录下来。
+
+    }
+  }
 }
+
+// 每5m获取一下历史的 ，并且获取这个最新的加上去

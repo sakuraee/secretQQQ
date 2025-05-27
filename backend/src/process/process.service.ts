@@ -7,41 +7,54 @@ import { ProcessInfo } from './process.interface';
 export class ProcessService {
   private processes: Map<string, ProcessInfo> = new Map();
 
-  create(createProcessDto: CreateProcessDto) {
-    const { command, args = [], options = {} } = createProcessDto;
-    const child = spawn(command, args, options);
-    const id = Date.now().toString();
-
-    const logs: string[] = [];
-    
-    child.stdout?.on('data', (data) => {
-      logs.push(data.toString());
-    });
-
-    child.stderr?.on('data', (data) => {
-      logs.push(data.toString());
-    });
-
-    const processInfo: ProcessInfo = {
-      id,
-      child,
+  async create(createProcessDto: CreateProcessDto) {
+    const {
       command,
-      args,
-      logs,
-      status: 'running',
-      startTime: new Date()
-    };
+      args = [],
+      options = {},
+      id = Date.now().toString(),
+    } = createProcessDto;
+    const child = spawn(command, args, options);
 
-    this.processes.set(id, processInfo);
+    return new Promise((resolve, reject) => {
+      const logs: string[] = [];
 
-    child.on('close', () => {
-      const process = this.processes.get(id);
-      if (process) {
-        process.status = 'exited';
-      }
+      child.stdout?.on('data', (data) => {
+        console.log(data.toString());
+        logs.push(data.toString());
+      });
+
+      child.stderr?.on('data', (data) => {
+        logs.push(data.toString());
+      });
+
+      const processInfo: ProcessInfo = {
+        id,
+        child,
+        command,
+        args,
+        logs,
+        status: 'running',
+        startTime: new Date(),
+      };
+
+      this.processes.set(id, processInfo);
+
+      child.on('close', () => {
+        const process = this.processes.get(id);
+        if (process) {
+          process.status = 'exited';
+        }
+      });
+
+      child.on('spawn', () => {
+        resolve({ id });
+      });
+
+      child.on('error', (err) => {
+        reject(err);
+      });
     });
-
-    return { id };
   }
 
   terminate(id: string) {
@@ -55,13 +68,15 @@ export class ProcessService {
   }
 
   list() {
-    return Array.from(this.processes.values()).map(({ id, command, args, status, startTime }) => ({
-      id,
-      command,
-      args,
-      status,
-      startTime
-    }));
+    return Array.from(this.processes.values()).map(
+      ({ id, command, args, status, startTime }) => ({
+        id,
+        command,
+        args,
+        status,
+        startTime,
+      }),
+    );
   }
 
   getLogs(id: string) {
@@ -70,5 +85,13 @@ export class ProcessService {
       throw new Error(`Process ${id} not found`);
     }
     return process.logs;
+  }
+
+  getStatus(id: string) {
+    const process = this.processes.get(id);
+    if (!process) {
+      return { status: 'not-running' };
+    }
+    return { status: process.status };
   }
 }

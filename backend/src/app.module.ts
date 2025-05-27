@@ -6,8 +6,8 @@ import { KlineModule } from './kline/kline.module';
 import { TaskService } from './task.service';
 
 @Module({
-  imports: [ProcessModule],
+  imports: [ProcessModule, KlineModule],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, TaskService],
 })
 export class AppModule {}
