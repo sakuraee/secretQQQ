@@ -17,7 +17,16 @@ import {
   FormControlLabel,
   Checkbox,
   TextField,
-  Button
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  TablePagination,
+  TableSortLabel
 } from '@mui/material'
 
 function App() {
@@ -161,7 +170,7 @@ function App() {
         alert('请等待K线数据加载完成')
         return
       }
-
+      console.log(allKlineData)
       setIsExecuting(true)
       setExecutionProgress(0)
 
@@ -181,10 +190,9 @@ function App() {
           setIsExecuting(false)
         }
       }
-      console.log(allKlineData)
       worker.postMessage({
         code,
-        klineData,
+        klineData: allKlineData ,
         initialAmount
       })
     } catch (error) {
@@ -355,6 +363,51 @@ function App() {
           </div>
 
           <div className="bottom-section">
+            {trades && (
+              <TableContainer component={Paper} sx={{ mt: 2 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>产品</TableCell>
+                      <TableCell>类型</TableCell>
+                      <TableCell>开仓时间</TableCell>
+                      <TableCell align="right">开仓价</TableCell>
+                      <TableCell>平仓时间</TableCell>
+                      <TableCell align="right">平仓价</TableCell>
+                      <TableCell align="right">利润(%)</TableCell>
+                      <TableCell align="right">当前资金</TableCell>
+                      <TableCell align="right">下单量</TableCell>
+                      <TableCell>消息</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {JSON.parse(trades).map((trade, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{trade.product}</TableCell>
+                        <TableCell>{trade.type}</TableCell>
+                        <TableCell>{new Date(trade.openTime).toLocaleString()}</TableCell>
+                        <TableCell align="right">{trade.openPrice.toLocaleString()}</TableCell>
+                        <TableCell>{trade.closeTime ? new Date(trade.closeTime).toLocaleString() : "-"}</TableCell>
+                        <TableCell align="right">{trade.closePrice}</TableCell>
+                        <TableCell 
+                          align="right"
+                          sx={{ color: trade.profit >= 0 ? 'success.main' : 'error.main' }}
+                        >
+                          {trade.profit ? trade.profit.toFixed(2) + "%" : " - "}
+                        </TableCell>
+                        <TableCell align="right">
+                          {trade.currentMoney ? trade.currentMoney.toFixed(2) : " - "}
+                        </TableCell>
+                        <TableCell align="right">
+                          {trade.tradeAmount ? trade.tradeAmount.toFixed(2) : " - "}
+                        </TableCell>
+                        <TableCell>{trade.message}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
             {selectedProducts.map((product, index) => (
               <div key={`${product}-${index}`} style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

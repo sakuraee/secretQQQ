@@ -1,0 +1,74 @@
+import { Injectable } from '@nestjs/common';
+import { spawn, ChildProcess } from 'child_process';
+import { CreateProcessDto } from './process.dto';
+import { ProcessInfo } from './process.interface';
+
+@Injectable()
+export class ProcessService {
+  private processes: Map<string, ProcessInfo> = new Map();
+
+  create(createProcessDto: CreateProcessDto) {
+    const { command, args = [], options = {} } = createProcessDto;
+    const child = spawn(command, args, options);
+    const id = Date.now().toString();
+
+    const logs: string[] = [];
+    
+    child.stdout?.on('data', (data) => {
+      logs.push(data.toString());
+    });
+
+    child.stderr?.on('data', (data) => {
+      logs.push(data.toString());
+    });
+
+    const processInfo: ProcessInfo = {
+      id,
+      child,
+      command,
+      args,
+      logs,
+      status: 'running',
+      startTime: new Date()
+    };
+
+    this.processes.set(id, processInfo);
+
+    child.on('close', () => {
+      const process = this.processes.get(id);
+      if (process) {
+        process.status = 'exited';
+      }
+    });
+
+    return { id };
+  }
+
+  terminate(id: string) {
+    const process = this.processes.get(id);
+    if (!process) {
+      throw new Error(`Process ${id} not found`);
+    }
+    process.child.kill();
+    process.status = 'terminated';
+    return { success: true };
+  }
+
+  list() {
+    return Array.from(this.processes.values()).map(({ id, command, args, status, startTime }) => ({
+      id,
+      command,
+      args,
+      status,
+      startTime
+    }));
+  }
+
+  getLogs(id: string) {
+    const process = this.processes.get(id);
+    if (!process) {
+      throw new Error(`Process ${id} not found`);
+    }
+    return process.logs;
+  }
+}
