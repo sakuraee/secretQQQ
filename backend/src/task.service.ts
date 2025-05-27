@@ -42,7 +42,7 @@ export class TaskService {
       'TRX-USDT-SWAP',
       'DOGE-USDT-SWAP',
     ];
-    const bars = ['15m', '1H'];
+    const bars = ['15m', '1H', '1m'];
     for (const instId of instIds) {
       for (const bar of bars) {
         let before: string | undefined = undefined;
@@ -292,10 +292,9 @@ export class TaskService {
 
       // 然后接收信息，使用当前的一个价格进行下单
 
-      // 将整个流程进行记录下来。
-
+      // 将整个流程进行记录下来存库。
     }
   }
 }
 
-// 每5m获取一下历史的 ，并且获取这个最新的加上去
+// 每5m获取一下历史的 ，并且获取这个最新的加上去 ，我先试一下不加上止盈止损行不行，不行的话再加，并且修改一下参考一下多获取一点点数据获取到个1m
