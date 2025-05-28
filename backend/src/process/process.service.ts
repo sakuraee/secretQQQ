@@ -1,97 +1,68 @@
 import { Injectable } from '@nestjs/common';
-import { spawn, ChildProcess } from 'child_process';
+import { fork, ChildProcess } from 'child_process';
 import { CreateProcessDto } from './process.dto';
-import { ProcessInfo } from './process.interface';
 
 @Injectable()
 export class ProcessService {
-  private processes: Map<string, ProcessInfo> = new Map();
+  private processes: Map<string, ChildProcess> = new Map();
 
-  async create(createProcessDto: CreateProcessDto) {
-    const {
-      command,
-      args = [],
-      options = {},
-      id = Date.now().toString(),
-    } = createProcessDto;
-    const child = spawn(command, args, options);
+  create(name: string, func: string, interval: number = 5000) {
+    const process = fork(__dirname + '/child/datamonitor.js');
+    this.processes.set(name, process);
+    // 发送函数和间隔时间
+    process.send({
+      funcStr: "console.log('hello world213123123')",
+      interval,
+    });
 
-    return new Promise((resolve, reject) => {
-      const logs: string[] = [];
+    // 接收子进程消息
+    process.on('message', (msg: any) => {
+      if (msg.type === 'output') {
+        console.log('子进程输出:', msg.data);
+      }
+    });
 
-      child.stdout?.on('data', (data) => {
-        console.log(data.toString());
-        logs.push(data.toString());
-      });
-
-      child.stderr?.on('data', (data) => {
-        logs.push(data.toString());
-      });
-
-      const processInfo: ProcessInfo = {
-        id,
-        child,
-        command,
-        args,
-        logs,
-        status: 'running',
-        startTime: new Date(),
-      };
-
-      this.processes.set(id, processInfo);
-
-      child.on('close', () => {
-        const process = this.processes.get(id);
-        if (process) {
-          process.status = 'exited';
-        }
-      });
-
-      child.on('spawn', () => {
-        resolve({ id });
-      });
-
-      child.on('error', (err) => {
-        reject(err);
-      });
+    process.on('exit', () => {
+      console.log(2224);
+      this.processes.delete(name);
     });
   }
 
-  terminate(id: string) {
-    const process = this.processes.get(id);
-    if (!process) {
-      throw new Error(`Process ${id} not found`);
-    }
-    process.child.kill();
-    process.status = 'terminated';
-    return { success: true };
-  }
+  // terminate(id: string) {
+  //   const process = this.processes.get(id);
+  //   if (!process) {
+  //     throw new Error(`Process ${id} not found`);
+  //   }
+  //   process.child.kill();
+  //   process.status = 'terminated';
+  //   return { success: true };
+  // }
 
-  list() {
-    return Array.from(this.processes.values()).map(
-      ({ id, command, args, status, startTime }) => ({
-        id,
-        command,
-        args,
-        status,
-        startTime,
-      }),
-    );
-  }
+  // list() {
+  //   return Array.from(this.processes.values()).map(
+  //     ({ id, command, args, status, startTime }) => ({
+  //       id,
+  //       command,
+  //       args,
+  //       status,
+  //       startTime,
+  //     }),
+  //   );
+  // }
 
-  getLogs(id: string) {
-    const process = this.processes.get(id);
-    if (!process) {
-      throw new Error(`Process ${id} not found`);
-    }
-    return process.logs;
-  }
+  // getLogs(id: string) {
+  //   const process = this.processes.get(id);
+  //   if (!process) {
+  //     throw new Error(`Process ${id} not found`);
+  //   }
+  //   return process.logs;
+  // }
 
-  getStatus(id: string) {
-    const process = this.processes.get(id);
+  getStatus(name: string) {
+    const process = this.processes.get(name);
     if (!process) {
       return { status: 'not-running' };
     }
-    return { status: process.status };
+    return { status: 'running' };
   }
 }

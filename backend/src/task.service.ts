@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import * as CryptoJS from 'crypto-js';
@@ -146,12 +147,6 @@ export class TaskService {
       'LTC-USDT-SWAP',
       'SOL-USDT-SWAP',
       'XRP-USDT-SWAP',
-      'BTC-USDT-SWAP',
-      'BNB-USDT-SWAP',
-      'DOGE-USDT-SWAP',
-      'ADA-USDT-SWAP',
-      'TRX-USDT-SWAP',
-      'DOGE-USDT-SWAP',
     ];
     const bars = ['15m', '1H'];
     for (const instId of instIds) {
@@ -196,22 +191,11 @@ export class TaskService {
     }
   }
 
-  data_monitor() {
-    setInterval(
-      () => {
-        console.log('开启定时获取');
-        this.fetchCurrentData();
-      },
-      1000 * 60 * 5,
-    );
-    this.fetchCurrentData();
-  }
-
   async sendSignedRequest(
     method: 'GET' | 'POST',
     requestPath: string,
     body?: any,
-  ): Promise<{ code: string; msg: string; data: string[][] }> {
+  ): Promise<{ code: string; msg: string; data: string[][] | any[] }> {
     // 从环境变量获取API凭证
     const apiKey = process.env.OKX_API_KEY;
     const secretKey = process.env.OKX_SECRET_KEY;
@@ -296,21 +280,58 @@ export class TaskService {
     }
   }
 
-  async makeOrder(instId : string , size : number , price :number) {
+  async makeOrder(
+    instId: string,
+    money: number,
+    price: number,
+    side: string,
+    leverage: number,
+  ) {
+    // 计算下单数量
+    const getInstrumentPath = `/api/v5/account/instruments?instType=SWAP`;
+    const getInstrument = await this.sendSignedRequest(
+      'GET',
+      getInstrumentPath,
+    );
+    const currentInstrument = getInstrument.data.filter(
+      (item: any) => item.instId === instId,
+    )[0];
+    const ctVal = currentInstrument.ctVal;
+    const lotSz = currentInstrument.lotSz;
+    const size =
+      Math.round((money * leverage) / (price * parseFloat(ctVal)) / lotSz) *
+      lotSz;
+    console.log(size);
+
+    const setLeveragePath = `/api/v5/account/set-leverage`;
+    const setLeverageBody = {
+      mgnMode: 'isolated',
+      lever: leverage,
+      instId,
+      posSide: side === 'buy' ? 'long' : 'short',
+    };
+
+    const setLeverageRes = await this.sendSignedRequest(
+      'POST',
+      setLeveragePath,
+      setLeverageBody,
+    );
+    console.log(setLeverageRes);
     const body = {
-      'ordType':"limit",
-      'tdMode':"isolated",
-      'side':"buy",
-      'sz':size,
-      'px':price,
-      "instId":instId,
-      "clOrdId":"b15",
-    }
+      ordType: 'limit',
+      tdMode: 'isolated',
+      side,
+      sz: size,
+      px: price,
+      posSide: side === 'buy' ? 'long' : 'short',
+      instId: instId,
+      clOrdId: 'b15',
+      ccy: 'USDT',
+    };
     const requestPath = `/api/v5/trade/order`;
-    const res = await this.sendSignedRequest('GET', requestPath , body);
+    const res = await this.sendSignedRequest('POST', requestPath, body);
     console.log(res);
   }
-  
 }
 
 // 每5m获取一下历史的 ，并且获取这个最新的加上去 ，我先试一下不加上止盈止损行不行，不行的话再加，并且修改一下参考一下多获取一点点数据获取到个1m
