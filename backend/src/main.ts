@@ -15,7 +15,7 @@ async function bootstrap() {
 
   // Initialize database on startup
   const taskService = app.get(TaskService);
-  //taskService.data_monitor();
+  taskService.makeOrder("BTC-USDT" , 1 , 1);
   taskService.fetchCurrentOneData('BTC-USDT-SWAP', '15m');
   await app.listen(process.env.PORT ?? 3000);
 }

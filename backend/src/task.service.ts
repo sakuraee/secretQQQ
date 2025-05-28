@@ -295,6 +295,22 @@ export class TaskService {
       // 将整个流程进行记录下来存库。
     }
   }
+
+  async makeOrder(instId : string , size : number , price :number) {
+    const body = {
+      'ordType':"limit",
+      'tdMode':"isolated",
+      'side':"buy",
+      'sz':size,
+      'px':price,
+      "instId":instId,
+      "clOrdId":"b15",
+    }
+    const requestPath = `/api/v5/trade/order`;
+    const res = await this.sendSignedRequest('GET', requestPath , body);
+    console.log(res);
+  }
+  
 }
 
 // 每5m获取一下历史的 ，并且获取这个最新的加上去 ，我先试一下不加上止盈止损行不行，不行的话再加，并且修改一下参考一下多获取一点点数据获取到个1m
