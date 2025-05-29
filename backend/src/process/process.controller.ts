@@ -26,6 +26,11 @@ export class ProcessController {
   //   return this.processService.getLogs(id);
   // }
 
+  @Get("initDataMontor")
+  initDataMontor() {
+    return this.processService.initDataMontor();
+  }
+
   @Get(':id/status')
   getStatus(@Param('id') id: string) {
     return this.processService.getStatus(id);

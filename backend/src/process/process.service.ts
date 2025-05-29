@@ -6,27 +6,47 @@ import { CreateProcessDto } from './process.dto';
 export class ProcessService {
   private processes: Map<string, ChildProcess> = new Map();
 
-  create(name: string, func: string, interval: number = 5000) {
-    const process = fork('../backend/src/process/child/datamonitor.js');
-    this.processes.set(name, process);
+  create(codeName:string ,bars: string | any , instIds :string ) {
+    const process = fork('../backend/src/process/child/trader.js');
+    this.processes.set(codeName, process);
     // 发送函数和间隔时间
     process.send({
-      funcStr: "console.log('hello world213123123')",
-      interval,
+      codeName,
+      instIds,
+      bars
     });
 
     // 接收子进程消息
     process.on('message', (msg: any) => {
       if (msg.type === 'output') {
-        console.log('子进程输出:', msg.data);
+        console.log(`${codeName} 子进程输出:`, msg.data);
+      }
+    });
+
+    process.on('exit', () => {
+      console.log(`${codeName} 子进程中止:` );
+      this.processes.delete(codeName);
+    });
+  }
+
+  async initDataMontor() {
+    const process = fork('../backend/src/process/child/datamonitor.js');
+    this.processes.set("data-monitor", process);
+
+    // 接收子进程消息
+    process.on('message', (msg: any) => {
+      if (msg.type === 'output') {
+        console.log('data-monitor 输出:', msg.data);
+        // 在这里应该加上如果说有当前的信息应该同步给每一个剩余的子进程,回去写一下吧
       }
     });
 
     process.on('exit', () => {
       console.log(2224);
-      this.processes.delete(name);
+      this.processes.delete("data-monitor");
     });
   }
+  
 
   // terminate(id: string) {
   //   const process = this.processes.get(id);

@@ -2,23 +2,45 @@
 // 从数据库中获取历史数据，从service 中获取最近一期的数据，
 // 把code跑一下 获取结果，进行操作
 // TODO: 平仓似乎没有调研怎么弄
+import { MongoClient } from 'mongodb';
 
-let code = ""
 // 先把单产品的做了
 let instIds = ""
 let bars = "1H"
 
+// 子进程或者或者说是部署着的名字
+let codeName = ""
+
+// 从主进程获取最新的未完结的kline
+let currentKline = null
+
+// 但是有个问题这个code 可能会被编辑,可能今天运行了明天改了然后再运行,这一块可能后续需要优化一下
+const DB_URL = process.env.DATABASE_URL || 'mongodb://localhost:27017';
+const DB_NAME = 'crypto_web';
+const client = new MongoClient(DB_URL);
+const db = client.db(DB_NAME)
+const kLineDataCollection = db.collection('KLineData');
+const deployedTradeInfo = db.collection('deployedTradeInfo');
+const SavedCodes = db.collection('deployedTradeInfo');
 
 function getCurrentMinute() {
     const now = new Date();
     return now.getMinutes();
 }
 
+
 process.on('message', async (msg) => {
-    if (msg.code) {
-        code = msg.code
+    if (msg.code && msg.instIds && msg.bars) {
+    // 直接应该传CODENAME
+        codeName = msg.codeName
         instIds = msg.instIds
         bars = msg.bars
+
+        code =(await SavedCodes.findOne({
+            where : {
+                codeName: codeName
+            }
+        })).code
     }
 })
 process.on('exit', () => {
@@ -37,45 +59,117 @@ process.on('exit', () => {
 );
 
 
-setInterval(() => {
-    if (code && instIds && bars) {
+global.intervalId = setInterval(async () => {
+    // 并且获取一下当前时间,现在默认成都是一个小时的吧 , 每个小时的59分算一下现在的因子是否要开仓或者平仓
+    if (code && instIds && bars && getCurrentMinute() == 59 ) {
         // 获取当前的一个为你
         try {
-            const executeUserCode = new Function('index', 'klineData', 'currentPosition', 'lastTrade', code )
+            const executeUserCode = new Function('index', 'klineData', 'currentPosition', 'lastTrade', code )          
             // 从数据库中获取历史数据 
-
+            const latestData = kLineDataCollection.find({
+                where: {
+                    instId: instIds,
+                    bar: bars
+                }
+            }).sort({ timestamp: -1 }).limit(100);
+            // TODO 这里需要确认顺序
+            let klineData = latestData.toReversed()
             //从主进程中获取最后一条的数据合在一起
 
-            // index应该直接就算最后一条即可
+            // currentKline
 
-            // currentPosition 和lastTrade需要保存好 都往库里存储吧// 直接参照那个交易明细直接存罢 ，（ 加上输出的时间 ，运行的代码名字 ，运行的币种，运行的bar）
+            klineData.push()
+            // index应该直接就算最后一条即可
+            const index = klineData.length - 1
+            
+            const tradeInfo = deployedTradeInfo.find({
+                where: {
+                    codeName: codeName,
+                    bar: bars,
+                    instId: instIds
+                }
+            }).sort({
+                createTime: -1
+            })
+            // currentPosition 是当前未闭合的最后一条记录
+            // lastTrade 是最近一次已经闭合了的交易记录
+            let currentPosition = {}
+            let lastTrade = {}
+            for(let i =0 ; i < tradeInfo.length; i++) {
+                if(tradeInfo[i].closePrice ){
+                    lastTrade = tradeInfo[i]
+                    break;
+                }
+            }
+
+            for(let i =0 ; i < tradeInfo.length; i++) {
+                if((!tradeInfo[i].closePrice) &&  tradeInfo[i].openPrice ){
+                    currentPosition = tradeInfo[i]
+                    break;
+                }
+            }
 
             // 执行code 
+            const result = executeUserCode(index, klineData, currentPosition, lastTrade || {})
+            // 参照前端回测的逻辑 ,只是多一步将数据插入库中
+            // 加入一些额外的字段 运行的代码名称 ,  选中监控的INSTID , 时间尺度 , 你插入这条数据的时间
+            
+            if (result && result.action && !currentPosition) {
+                // 开仓
+                
+                currentPosition = {
+                  product: product, // 记录当前持仓产品
+                  type: result.action, // 'buy' or 'sell'
+                  openTime: point.timestamp,
+                  openPrice: point.close,
+                  closeTime: null,
+                  closePrice: null,
+                  profit: null,
+                  currentMoney: null,
+                  tradeAmount: result.amount , // 使用传入的金额或默认初始金额
+                  message: result.message,
+                  // 运行代码的相关信息
+                  instId: instIds,
+                  bar: bars,
+                  createTime: (new Date()).getTime(),
+                  codeName: codeName,
+                }
 
-            // 将返回的结果分类判断 进行各种下单操作，先来进行成发邮件的操作罢
+                deployedTradeInfo.insertOne(currentPosition)
 
-            const result = dynamicFunc(a, b, extra);
+              } else if (result && result.action && currentPosition) {
+                // 平仓 - 做多平仓是sell，做空平仓是buy
+                if ((currentPosition.type === 'buy' && result.action === 'sell') || 
+                    (currentPosition.type === 'sell' && result.action === 'buy')) {
+                  
+                  currentPosition.closeTime = point.timestamp
+                  currentPosition.closePrice = point.close
+                  currentPosition.message += " // " + result.message
+                  // 利润计算：做多=(平仓价-开仓价)/开仓价，做空=(开仓价-平仓价)/开仓价
+                  currentPosition.profit = currentPosition.type === 'buy' 
+                    ? (currentPosition.closePrice - currentPosition.openPrice) / currentPosition.openPrice * 100
+                    : (currentPosition.openPrice - currentPosition.closePrice) / currentPosition.openPrice * 100
+                  
+                  // TODO ：这里应该要加上手续费扣除
+                  currentPosition.currentMoney = trades.length > 0 
+                    ? trades[trades.length - 1].currentMoney + (currentPosition.tradeAmount * currentPosition.profit / 100)
+                    : initialAmount + (currentPosition.tradeAmount * currentPosition.profit / 100)
+                  
+                  deployedTradeInfo.updateOne({
+                    where: {
+                      _id: currentPosition._id 
+                    },
+                    data: currentPosition
+                  })
+
+                }
+              
+            }
+
+
             console.log('Result:', result); // 输出: Result: 35
           } catch (error) {
             console.error('Error executing dynamic code:', error);
           }
     }
 }, 1000 * 50)
-
-const dbCode = `
-  return a + b + extra;
-`;
-
-// 当前作用域的变量
-const a = 10;
-const b = 20;
-const extra = 5;
-
-// 创建函数并执行
-try {
-    const dynamicFunc = new Function('a', 'b', 'extra', dbCode);
-    const result = dynamicFunc(a, b, extra);
-    console.log('Result:', result); // 输出: Result: 35
-} catch (error) {
-    console.error('Error executing dynamic code:', error);
-}
