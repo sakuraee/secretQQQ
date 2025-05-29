@@ -1,5 +1,15 @@
 /* eslint-disable */
-import sendSignedRequest from '../../utils/index';
+import { sendSignedRequest } from '../../utils/index.js';
+import { Db, MongoClient } from 'mongodb';
+
+const DB_URL = process.env.DATABASE_URL || 'mongodb://localhost:27017';
+const DB_NAME = 'crypto_web';
+
+const client = new MongoClient(DB_URL);
+
+const db = client.db(DB_NAME)
+const kLineDataCollection = db.collection('KLineData');
+
 process.on('message', async (msg) => {
   if (msg.action === 'stop') {
     // 清理工作
@@ -27,7 +37,7 @@ async function main() {
       'SOL-USDT-SWAP',
       'XRP-USDT-SWAP',
     ];
-    const bars = ['15m', '1H'];
+    const bars = ['15m', '1H' , '1m', "5m"];
     for (let instId of instIds) {
       for (let bar of bars) {
         const params = new URLSearchParams();
@@ -36,11 +46,32 @@ async function main() {
         const requestPath = `/api/v5/market/candles?${params.toString()}`;
         const res = await sendSignedRequest('GET', requestPath);
         const data = res.data;
-        const document =data.filter(item => item[8] === '1')
+        const document =data.filter(item => item[8] == '1').map(item=>{
+          return {
+            product: instId,
+            bar: bar,
+            timestamp: new Date(parseInt(item[0])),
+            open: parseFloat(item[1]),
+            high: parseFloat(item[2]),
+            low: parseFloat(item[3]),
+            close: parseFloat(item[4]),
+            vol: parseFloat(item[5]),
+            volCcy: parseFloat(item[6]),
+            volCcyQuote: parseFloat(item[7]),
+            isReal: true,
+          }
+        })
         try{
+          process.send({
+            type: 'output',
+            data: `插入长度 ${JSON.stringify(document.length)}`,
+          });
           await kLineDataCollection.insertMany(document)
         }catch(e){
-
+          process.send({
+            type: 'output',
+            data: "fuck",
+        });
         }
         process.send({
             type: 'output',
@@ -60,5 +91,7 @@ async function main() {
     process.send({ type: 'output', data: error.message });
   }
 }
+global.intervalId = setInterval(()=>{
+  main();
+},1000 * 60 )
 
-main();

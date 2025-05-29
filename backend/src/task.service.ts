@@ -36,14 +36,12 @@ export class TaskService {
       'LTC-USDT-SWAP',
       'SOL-USDT-SWAP',
       'XRP-USDT-SWAP',
-      'BTC-USDT-SWAP',
       'BNB-USDT-SWAP',
       'DOGE-USDT-SWAP',
       'ADA-USDT-SWAP',
       'TRX-USDT-SWAP',
-      'DOGE-USDT-SWAP',
     ];
-    const bars = ['15m', '1H', '1m'];
+    const bars = ['15m', '1H', '1m', "5m"];
     for (const instId of instIds) {
       for (const bar of bars) {
         let before: string | undefined = undefined;

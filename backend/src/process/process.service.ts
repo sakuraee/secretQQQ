@@ -7,7 +7,7 @@ export class ProcessService {
   private processes: Map<string, ChildProcess> = new Map();
 
   create(name: string, func: string, interval: number = 5000) {
-    const process = fork(__dirname + '/child/datamonitor.js');
+    const process = fork('../backend/src/process/child/datamonitor.js');
     this.processes.set(name, process);
     // 发送函数和间隔时间
     process.send({
