@@ -3,7 +3,7 @@
 // 把code跑一下 获取结果，进行操作
 // TODO: 平仓似乎没有调研怎么弄
 import { MongoClient } from 'mongodb';
-import { sendEmail } from '../../utils/index.js';
+import { sendEmail  , makeOrder } from '../../utils/index.js';
 
 // 先把单产品的做了
 let instIds = ""
@@ -11,7 +11,7 @@ let bars = "1H"
 
 // 子进程或者或者说是部署着的名字
 let codeName = ""
-
+let code = ""
 // 从主进程获取最新的未完结的kline
 let currentKline = null
 
@@ -22,7 +22,7 @@ const client = new MongoClient(DB_URL);
 const db = client.db(DB_NAME)
 const kLineDataCollection = db.collection('KLineData');
 const deployedTradeInfo = db.collection('deployedTradeInfo');
-const SavedCodes = db.collection('deployedTradeInfo');
+const SavedCodes = db.collection('SavedCodes');
 
 function getCurrentMinute() {
     const now = new Date();
@@ -31,23 +31,30 @@ function getCurrentMinute() {
 
 
 process.on('message', async (msg) => {
-    if (msg.code && msg.instIds && msg.bars) {
-        // 直接应该传CODENAME
-        codeName = msg.codeName
-        instIds = msg.instIds
-        bars = msg.bars
+    try{
+        if (msg.codeName && msg.instIds && msg.bars) {
+            // 直接应该传CODENAME
+            codeName = msg.codeName
+            instIds = msg.instIds
+            bars = msg.bars
+            
 
-        code = (await SavedCodes.findOne({
-            where: {
-                codeName: codeName
-            }
-        })).code
-    }
-    if (msg.currentData) {
-        const allCurrentKline = JSON.parse(msg.currentData)
-        currentKline = allCurrentKline[`${instIds}-${bars}`]
+            const document = await SavedCodes.findOne({name:codeName})
+            code =document.code
 
+        }
+        if (msg.currentData) {
+            const allCurrentKline = JSON.parse(msg.currentData)
+            currentKline = allCurrentKline[`${instIds}-${bars}`]
+    
+        }
+    }catch (error) {
+        process.send({
+            type: 'output',
+            data: JSON.stringify(error) +  "启动就有问题捏",
+        });
     }
+    
 })
 process.on('exit', () => {
     if (global.intervalId) {
@@ -65,27 +72,28 @@ process.on('exit', () => {
 );
 
 
-global.intervalId = setInterval(() => {
-    process.send({
-        type: 'output',
-        data: '啊吧啊吧',
-    });
+global.intervalId = setInterval(async () => {
     // 并且获取一下当前时间,现在默认成都是一个小时的吧 , 每个小时的59分算一下现在的因子是否要开仓或者平仓
     // 获取当前的一个为你
     try {
-        if (code && instIds && bars && getCurrentMinute() == 59) {
+        ///if (code && instIds && bars && getCurrentMinute() == 59) {
+        if (code && instIds && bars && currentKline) {
+            
             const executeUserCode = new Function('index', 'klineData', 'currentPosition', 'lastTrade', code)
             // 从数据库中获取历史数据 
-            const latestData = kLineDataCollection.find({
-                where: {
-                    instId: instIds,
+            const cursor =await kLineDataCollection.find({
+                    product: instIds,
                     bar: bars
-                }
             }).sort({ timestamp: -1 }).limit(100);
+            
+            const latestData = await cursor.toArray();
+
+
             // TODO 这里需要确认顺序
             let klineData = latestData.toReversed()
             //从主进程中获取最后一条的数据合在一起
 
+        
             // currentKline
             klineData.push(currentKline)
 
@@ -119,16 +127,24 @@ global.intervalId = setInterval(() => {
                 }
             }
 
+            
+
             // 执行code 
             const result = executeUserCode(index, klineData, currentPosition, lastTrade || {})
 
-            sendEmail(`${codeName}-${instIds}-${bars} 当前时间${(new Date()).toLocaleString()} Result: ${JSON.stringify(result)}`)
+            
+            
+
+            process.send({
+                type: 'output',
+                data: `${codeName}-${instIds}-${bars} 当前时间${(new Date()).toLocaleString()} Result: ${JSON.stringify(result)}`,
+            });
             // 参照前端回测的逻辑 ,只是多一步将数据插入库中
             // 加入一些额外的字段 运行的代码名称 ,  选中监控的INSTID , 时间尺度 , 你插入这条数据的时间
 
             if (result && result.action && !currentPosition) {
                 // 开仓
-
+                sendEmail(`${codeName}-${instIds}-${bars} 当前时间${(new Date()).toLocaleString()} Result: ${JSON.stringify(result)}`)
                 currentPosition = {
                     product: product, // 记录当前持仓产品
                     type: result.action, // 'buy' or 'sell'
@@ -150,6 +166,7 @@ global.intervalId = setInterval(() => {
                 deployedTradeInfo.insertOne(currentPosition)
 
             } else if (result && result.action && currentPosition) {
+                sendEmail(`${codeName}-${instIds}-${bars} 当前时间${(new Date()).toLocaleString()} Result: ${JSON.stringify(result)}`)
                 // 平仓 - 做多平仓是sell，做空平仓是buy
                 if ((currentPosition.type === 'buy' && result.action === 'sell') ||
                     (currentPosition.type === 'sell' && result.action === 'buy')) {
@@ -177,11 +194,13 @@ global.intervalId = setInterval(() => {
                 }
 
             }
-
-
-            console.log('Result:', result);
         }// 输出: Result: 35
     } catch (error) {
-        console.error('Error executing dynamic code:', error);
+        process.send({
+            type: 'output',
+            data: JSON.stringify(error) +  "'Error executing dynamic code:', ",
+        });
     }
-}, 1000 * 50)
+}, 1000 * 60 * 50 )
+
+// TODO 试验一下平仓接口怎么写

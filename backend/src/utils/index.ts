@@ -104,4 +104,58 @@ export const sendEmail = async (emailContent) => {
   }
 };
 
-export default {sendSignedRequest ,sendEmail};
+export const makeOrder = async (
+  instId: string,
+  money: number,
+  price: number,
+  side: string, // buy / sell 
+  posSide : string, // long /short
+  orderName : string,
+  leverage: number = 10, // 默认杠杆倍数为10
+) => {
+  // 计算下单数量
+  const getInstrumentPath = `/api/v5/account/instruments?instType=SWAP`;
+  const getInstrument = await sendSignedRequest(
+    'GET',
+    getInstrumentPath,
+  );
+  const currentInstrument = getInstrument.data.filter(
+    (item: any) => item.instId === instId,
+  )[0];
+  const ctVal = currentInstrument.ctVal;
+  const lotSz = currentInstrument.lotSz;
+  const size =
+    Math.round((money * leverage) / (price * parseFloat(ctVal)) / lotSz) *
+    lotSz;
+  console.log(size);
+
+  const setLeveragePath = `/api/v5/account/set-leverage`;
+  const setLeverageBody = {
+    mgnMode: 'isolated',
+    lever: leverage,
+    instId,
+    posSide,
+  };
+
+  const setLeverageRes = await sendSignedRequest(
+    'POST',
+    setLeveragePath,
+    setLeverageBody,
+  );
+  console.log(setLeverageRes);
+  const body = {
+    ordType: 'limit',
+    tdMode: 'isolated',
+    side,
+    sz: size,
+    px: price,
+    posSide,
+    instId: instId,
+    clOrdId: (new Date()).getTime() ,
+    ccy: 'USDT',
+  };
+  const requestPath = `/api/v5/trade/order`;
+  const res = await sendSignedRequest('POST', requestPath, body);
+  console.log(res);
+}
+export default {sendSignedRequest ,sendEmail ,makeOrder };

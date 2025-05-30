@@ -111,5 +111,5 @@ async function main() {
 }
 global.intervalId = setInterval(()=>{
   main();
-},1000 * 60 )
+},1000 * 50 )
 

@@ -41,7 +41,8 @@ export class TaskService {
       'ADA-USDT-SWAP',
       'TRX-USDT-SWAP',
     ];
-    const bars = ['15m', '1H', '1m', "5m"];
+    // const bars = ['15m', '1H', '1m', "5m"];
+    const bars = ['15m', '1H'];
     for (const instId of instIds) {
       for (const bar of bars) {
         let before: string | undefined = undefined;
@@ -280,59 +281,6 @@ export class TaskService {
 
       // 将整个流程进行记录下来存库。
     }
-  }
-
-  async makeOrder(
-    instId: string,
-    money: number,
-    price: number,
-    side: string,
-    leverage: number,
-  ) {
-    // 计算下单数量
-    const getInstrumentPath = `/api/v5/account/instruments?instType=SWAP`;
-    const getInstrument = await this.sendSignedRequest(
-      'GET',
-      getInstrumentPath,
-    );
-    const currentInstrument = getInstrument.data.filter(
-      (item: any) => item.instId === instId,
-    )[0];
-    const ctVal = currentInstrument.ctVal;
-    const lotSz = currentInstrument.lotSz;
-    const size =
-      Math.round((money * leverage) / (price * parseFloat(ctVal)) / lotSz) *
-      lotSz;
-    console.log(size);
-
-    const setLeveragePath = `/api/v5/account/set-leverage`;
-    const setLeverageBody = {
-      mgnMode: 'isolated',
-      lever: leverage,
-      instId,
-      posSide: side === 'buy' ? 'long' : 'short',
-    };
-
-    const setLeverageRes = await this.sendSignedRequest(
-      'POST',
-      setLeveragePath,
-      setLeverageBody,
-    );
-    console.log(setLeverageRes);
-    const body = {
-      ordType: 'limit',
-      tdMode: 'isolated',
-      side,
-      sz: size,
-      px: price,
-      posSide: side === 'buy' ? 'long' : 'short',
-      instId: instId,
-      clOrdId: 'b15',
-      ccy: 'USDT',
-    };
-    const requestPath = `/api/v5/trade/order`;
-    const res = await this.sendSignedRequest('POST', requestPath, body);
-    console.log(res);
   }
 }
 
