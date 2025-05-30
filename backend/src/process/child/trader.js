@@ -203,4 +203,4 @@ global.intervalId = setInterval(async () => {
     }
 }, 1000 * 60 * 50 )
 
-// TODO 试验一下平仓接口怎么写
+// TODO 试验一下平仓接口怎么写  也应该参照使用node-scheduler 来定时执行
