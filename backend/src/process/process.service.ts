@@ -54,7 +54,7 @@ export class ProcessService {
     // 接收子进程消息
     process.on('message', (msg: any) => {
       if (msg.type === 'output') {
-         // console.log('data-monitor 输出:', msg.data);
+         console.log('data-monitor 输出:', msg.data);
         // 在这里应该加上如果说有当前的信息应该同步给每一个剩余的子进程,回去写一下吧
       }
 
