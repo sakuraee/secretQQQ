@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { sendSignedRequest } from '../../utils/index.js';
 import { Db, MongoClient } from 'mongodb';
-
+import * as nodeSchedule  from 'node-schedule';
 const DB_URL = process.env.DATABASE_URL || 'mongodb://localhost:27017';
 const DB_NAME = 'crypto_web';
 
@@ -68,16 +68,8 @@ async function main() {
           }
         })
         try{
-          process.send({
-            type: 'output',
-            data: `插入长度 ${JSON.stringify(document.length)}`,
-          });
           await kLineDataCollection.insertMany(document)
         }catch(e){
-          process.send({
-            type: 'output',
-            data: "fuck",
-        });
         }
         let temp = {
           product: instId,
@@ -109,7 +101,9 @@ async function main() {
     process.send({ type: 'output', data: error.message });
   }
 }
-global.intervalId = setInterval(()=>{
+
+nodeSchedule.scheduleJob('55 * * * * *', function(){
   main();
-},1000 * 50 )
+});
+
 
