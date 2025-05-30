@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as CryptoJS from 'crypto-js';
+import * as nodemailer   from 'nodemailer';
 const sendSignedRequest = async (
   method: 'GET' | 'POST',
   requestPath: string,
@@ -63,4 +64,44 @@ const sendSignedRequest = async (
   }
 };
 
-export default sendSignedRequest;
+export const sendEmail = async (emailContent) => {
+  // 从环境变量获取邮件服务配置
+  const emailService = process.env.EMAIL_SERVICE;
+  const emailUser = process.env.EMAIL_USER;
+  const emailPass = process.env.EMAIL_PASS;
+  const targetEmail = process.env.TARGET_EMAIL;
+  
+  if (!emailService || !emailUser || !emailPass || !targetEmail) {
+    throw new Error('Missing email credentials in environment variables');
+  }
+
+  // 创建邮件发送器
+  let transporter = nodemailer.createTransport({
+    host: emailService,
+    port: 465,
+    secure: true,
+    auth: {
+      user: emailUser,
+      pass: emailPass,
+    },
+  });
+
+  // 设置邮件选项
+  let mailOptions = {
+    from: emailUser,
+    to: targetEmail,
+    subject: 'New Email Notification',
+    text: emailContent,
+  };
+
+  // 发送邮件
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully');
+  } catch (error) {
+    console.error('Error sending email:', error);
+    throw new Error(`Failed to send email: ${error.message}`);
+  }
+};
+
+export default {sendSignedRequest ,sendEmail};

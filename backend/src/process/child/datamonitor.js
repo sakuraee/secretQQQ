@@ -36,8 +36,14 @@ async function main() {
       'LTC-USDT-SWAP',
       'SOL-USDT-SWAP',
       'XRP-USDT-SWAP',
+      'BNB-USDT-SWAP',
+      'DOGE-USDT-SWAP',
+      'ADA-USDT-SWAP',
+      'TRX-USDT-SWAP',
     ];
-    const bars = ['15m', '1H' , '1m', "5m"];
+    // const bars = ['15m', '1H' , '1m', "5m"];
+    const bars = ['15m', '1H'];
+    let finalRes = {};
     for (let instId of instIds) {
       for (let bar of bars) {
         const params = new URLSearchParams();
@@ -73,10 +79,20 @@ async function main() {
             data: "fuck",
         });
         }
-        process.send({
-            type: 'output',
-            data: instId + ' ' + bar + ' ' + data[0],
-        });
+        let temp = {
+          product: instId,
+          bar: bar,
+          timestamp: new Date(parseInt(data[0][0])),
+          open: parseFloat(data[0][1]),
+          high: parseFloat(data[0][2]),
+          low: parseFloat(data[0][3]),
+          close: parseFloat(data[0][4]),
+          vol: parseFloat(data[0][5]),
+          volCcy: parseFloat(data[0][6]),
+          volCcyQuote: parseFloat(data[0][7]),
+          isReal: true,
+        }
+        finalRes[`${instId}-${bar}`]  = temp
 
         // data.filter(item=> item);
         // .then((res) => {
@@ -87,6 +103,8 @@ async function main() {
         // });
       }
     }
+    process.send({ type: 'result', data: JSON.stringify(finalRes) });
+    process.send({ type: 'output', data: "已上传最新未完结k线数据" });
   } catch (error) {
     process.send({ type: 'output', data: error.message });
   }

@@ -19,6 +19,7 @@
     "prismjs": "^1.30.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.1",
     "react-simple-code-editor": "^0.14.1"
   },
   "devDependencies": {

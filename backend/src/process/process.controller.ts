@@ -31,8 +31,21 @@ export class ProcessController {
     return this.processService.initDataMontor();
   }
 
+  @Get("getAll")
+  getAll() {
+    return this.processService.getAll();
+  }
+
+  @Post("deploy")
+  deploy(@Body() body: { id: string ,bars: string , instIds : string }) {
+    return this.processService.deploy(body.id ,body.bars , body.instIds);
+  }
+
   @Get(':id/status')
   getStatus(@Param('id') id: string) {
     return this.processService.getStatus(id);
   }
 }
+
+// TODO 
+// 后续可以加上rank模式

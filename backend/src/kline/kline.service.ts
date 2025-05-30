@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MongoClient, ObjectId } from 'mongodb';
-
+import { sendEmail }  from '../utils/index.js';
 const DB_URL = process.env.DATABASE_URL || 'mongodb://localhost:27017';
 const DB_NAME = 'crypto_web';
 

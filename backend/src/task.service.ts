@@ -145,6 +145,10 @@ export class TaskService {
       'LTC-USDT-SWAP',
       'SOL-USDT-SWAP',
       'XRP-USDT-SWAP',
+      'BNB-USDT-SWAP',
+      'DOGE-USDT-SWAP',
+      'ADA-USDT-SWAP',
+      'TRX-USDT-SWAP',
     ];
     const bars = ['15m', '1H'];
     for (const instId of instIds) {
