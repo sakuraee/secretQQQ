@@ -76,8 +76,8 @@ global.intervalId = setInterval(async () => {
     // 并且获取一下当前时间,现在默认成都是一个小时的吧 , 每个小时的59分算一下现在的因子是否要开仓或者平仓
     // 获取当前的一个为你
     try {
-        ///if (code && instIds && bars && getCurrentMinute() == 59) {
-        if (code && instIds && bars && currentKline) {
+        if (code && instIds && bars && getCurrentMinute() == 59) {
+        // if (code && instIds && bars && currentKline) {
             
             const executeUserCode = new Function('index', 'klineData', 'currentPosition', 'lastTrade', code)
             // 从数据库中获取历史数据 
